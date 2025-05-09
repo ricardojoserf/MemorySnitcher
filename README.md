@@ -9,8 +9,9 @@
 - The proposal is using an application with any vulnerability which leaks memory addresses (on purpose).
 
 - Does a poorly-coded application get detected?
-<br>
 
+
+<br>
 
 ## Motivation
 
@@ -61,8 +62,9 @@ With this code we would have *GetModuleHandleA* and *GetProcAddress* in the impo
 
 ![it1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nativentdllremap_import_table.png)
 
+There are 17 imported functions from Kernel32.dll, the first 2 in the list are those. 
 
-There are 17 imported functions from Kernel32.dll, the first 2 functions are those functions. Regarding the other 15 functions, I created a very simple program to test if these always appear:
+Regarding the other 15 functions, I created a very simple program to test if these always appear:
 
 ```
 #include <iostream>
@@ -83,7 +85,7 @@ This means the binary was compiled with the C Runtime (CRT) included, which embe
 
 <br>
 
-## Easiest approach
+## First Approach
 
 These addresses are just numbers, so there are some silly methods to use them, but these will change for every system. First, let's print the values: 
 
@@ -210,7 +212,7 @@ int main() {
 Compile it like this:
 
 ```
-cl /Fe:format_string.exe format_string.c /Od /Zi /RTC1
+cl /Fe:leak_formatstring.exe leak_formatstring.c /Od /Zi /RTC1
 ```
 
 And execute it:
@@ -240,16 +242,9 @@ int main() {
 
 Compile it again and get the addresses:
 
-```
-cl /Fe:format_string_addresses.exe format_string_addresses.c /Od /Zi /RTC1
-```
-
-
 ![fs2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_2.png)
 
-
-<br>
-
+--------------------------------------
 
 ### 2. Buffer Over-read (Heartbleed-like)
 
@@ -276,7 +271,7 @@ int main() {
 Compile it like this:
 
 ```
-cl /Fe:overread.exe overread.c /Od /Zi /RTC1
+cl /Fe:leak_overread.exe leak_overread.c /Od /Zi /RTC1
 ```
 
 And execute it:
@@ -310,12 +305,6 @@ int main() {
 
 Compile it again and get the addresses:
 
-```
-cl /Fe:overread_addresses.exe overread_addresses.c /Od /Zi /RTC1
-```
-
-
 ![or2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_2.png)
-
 
 <br>
