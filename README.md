@@ -1,25 +1,32 @@
 # MemorySnitcher
 
-Using a purposefully vulnerable application to leak the address of NtReadVirtualMemory, removing the need to use any Kernel32 function for API resolution in your malicious application.
+## TL,DR - Does a poorly-coded application get detected?
 
+- I use dynamic API resolution to avoid functions to appear in the import table of the binary, but it requires at least the ntdll.dll library and the *NtReadVirtualMemory* function addresses.
+
+- Using a separate application which just prints these addresses might look suspicious.
+
+- The proposal is using an application with any vulnerability which leaks memory addresses (on purpose).
+<br>
 
 ## Motivation
 
-Last months, I have made public some tools which use "only" lower-level functions in the ntdll.dll library. This DLL contains the lowest level functions in user mode because it interacts directly with ntoskrnl.exe, which is kernel mode.
+Last months, I have made public some tools which use "only" lower-level functions in the ntdll.dll library. This DLL contains the lowest level functions in user mode because it interacts directly with ntoskrnl.exe, which is already kernel mode.
 
 Some of these projects have been:
 
-- NativeDump and TrickDump
+- [NativeDump](https://github.com/ricardojoserf/NativeDump) and [TrickDump](https://github.com/ricardojoserf/TrickDump): To dump the LSASS process.
 
-- NativeBypassCredGuard
+- [NativeBypassCredGuard](https://github.com/ricardojoserf/NativeBypassCredGuard): To patch Credential Guard.
 
-- NativeTokenImpersonate
+- [NativeTokenImpersonate](https://github.com/ricardojoserf/NativeTokenImpersonate): To impersonate tokens.
 
-- NativeNtdllRemap
+- [NativeNtdllRemap](https://github.com/ricardojoserf/NativeNtdllRemap): Remap ntdll.dll using a suspended process.
+
 
 However, it bothered me to have all the necessary functions in the import table of the binary, because this could hint towards the true intentions of the compiled binary - you know, importing NtOpenProcessToken and NtAdjustPrivilegesToken might look suspicious :)
 
-To solve this, I decided to use dynamic API resolution by creating functions mimicking GetModuleHandle and GetProcAddress. As a short reminder, GetModuleHandle returns the address of a loaded DLL given the library name (LoadLibrary works too but I would only use it if the DLL is not already loaded in the process) and GetProcAddress returns the address of a function given the DLL address and the function name. The ntdll.dll library is always the first DLL to get loaded in a process and it gets always loaded, so we can simplify this problem to GetModuleHandle + GetProcAddress when we work with NTAPIs.
+To solve this, I decided to use dynamic API resolution by creating functions mimicking GetModuleHandle and GetProcAddress. As a short reminder, GetModuleHandle returns the address of a loaded DLL given the library name (LoadLibrary works too but I would only use it if the DLL is not already loaded in the process) and GetProcAddress returns the address of a function given the DLL address and the function name. """The ntdll.dll library is always the first DLL to get loaded in a process and it gets always loaded, so we can simplify this problem to GetModuleHandle + GetProcAddress when we work with NTAPIs."""
 
 By walking the PEB it is possible to get this functionality using custom implementations, and you can do it using only functions in ntdll.dll:
 
@@ -29,7 +36,17 @@ By walking the PEB it is possible to get this functionality using custom impleme
 
 The problem here: you need some way to resolve at least ntdll.dll address and NtReadVirtualMemory. With those 2 addresses, you can use CustomGetProcAddress to get the function address of any function in ntdll.dll. Or, resolving NtQueryInformationProcess, you can use CustomGetProcAddress to get the base address of any DLL using CustomGetModuleHandle, in case you are not sticking to using only NTAPIs (understandable hahaha).
 
-In C, it would look something like this:
+In C, first the function delegates are defined:
+
+```
+typedef NTSTATUS(WINAPI* NtReadVirtualMemoryFn)(HANDLE, PVOID, PVOID, SIZE_T, PSIZE_T);
+typedef NTSTATUS(WINAPI* NtQueryInformationProcessFn)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
+
+NtQueryInformationProcessFn NtQueryInformationProcess;
+NtReadVirtualMemoryFn NtReadVirtualMemory;
+```
+
+Then, resolving the function *NtQueryInformationProcess* would look like this:
 
 ```
 HMODULE hNtdll = GetModuleHandleA("ntdll.dll");
@@ -37,20 +54,12 @@ NtReadVirtualMemory = (NtReadVirtualMemoryFn)GetProcAddress((HMODULE)hNtdll, "Nt
 NtQueryInformationProcess = (NtQueryInformationProcessFn)CustomGetProcAddress(hNtdll, "NtQueryInformationProcess");
 ```
 
-Taking into account that the function structure is defined earlier in the code:
+With this code we would have *GetModuleHandleA* and *GetProcAddress* in the import table, very suspicious. Let's run PE-BEAR and see what the table looks like:
 
-```
-typedef NTSTATUS(WINAPI* NtReadVirtualMemoryFn)(HANDLE, PVOID, PVOID, SIZE_T, PSIZE_T);
-typedef NTSTATUS(WINAPI* NtQueryInformationProcessFn)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
-NtQueryInformationProcessFn NtQueryInformationProcess;
-NtReadVirtualMemoryFn NtReadVirtualMemory;
-```
+![it1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nativentdllremap_import_table.png)
 
-And with these lines of code we would have GetModuleHandle and GetProcAddress in the import table, very suspicious. Let's fire up PE-BEAR and see what the table looks like:
 
-![img1](...nativentdllremap_import_table.png)
-
-There are 17 imported functions from Kernel32.dll, the first 2 functions are GetModuleHandleA and GetProcAddress. What about the other 15 functions? I created a very simple program:
+There are 17 imported functions from Kernel32.dll, the first 2 functions are those functions. Regarding the other 15 functions, I created a very simple program to test if these always appear:
 
 ```
 #include <iostream>
@@ -61,16 +70,19 @@ int main(int argc, char* argv[]) {
 }
 ```
 
-And the same 15 functions appear in the import table, so it is not related to our code (it is just the CRT!):
+And the same 15 functions appear in the import table, so it is not related to our code:
 
-![img2](...printf_program_import_table.png) 
+![it2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/printf_program_import_table.png)
 
+
+This means the binary was compiled with the C Runtime (CRT) included, which embeds the necessary runtime support directly into the executable. There are many blogs about compiling without CRT and it is not my goal to do this: if I get only these functions in the import table I think it will be good enough.  
+
+
+<br>
 
 ## Easiest approach
 
-These addresses are just numbers, so they can be hardcoded or sent to the program as an input parameter. 
-
-For example, we can create a program to print these addresses: 
+These addresses are just numbers, so there are some silly methods to use them, but these will change for every system. First, let's print the values: 
 
 ```
 #include <iostream>
@@ -79,13 +91,16 @@ For example, we can create a program to print these addresses:
 int main(int argc, char* argv[]) {
     HMODULE hNtdll = LoadLibraryA("ntdll.dll");
     FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
-    printf("[+] ntdll.dll address: \t\t0x%p\n", hNtdll);
+    printf("[+] ntdll.dll address: \t\t\t0x%p\n", hNtdll);
     printf("[+] NtReadVirtualMemory address: \t0x%p\n", pNtReadVirtualMemory);
     return 0;
 }
 ```
 
-Hardcoding the values, the previous code would look like this now:
+![ra](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/read_addresses.png)
+
+
+We can simply hardcode the values in the code, making the previous code to look like this now:
 
 ```
 HMODULE hNtdll = (HMODULE)0x00007FFABF8B0000;
@@ -93,9 +108,162 @@ NtReadVirtualMemory = (NtReadVirtualMemoryFn)0x00007FFABF94D7B0;
 NtQueryInformationProcess = (NtQueryInformationProcessFn)CustomGetProcAddress(hNtdll, "NtQueryInformationProcess");
 ``` 
 
-Using input parameters, the previous code would look like this now:
+Or we can use input parameters:
 
-``` 
+```
+int main(int argc, char* argv[]) {
+    if (argc == 3) {
+        char* endptr1;
+        char* endptr2;
+        uintptr_t ntdllAddr = (uintptr_t)strtoull(argv[1], &endptr1, 0);
+        uintptr_t ntrvmAddr = (uintptr_t)strtoull(argv[2], &endptr2, 0);            
+        HMODULE hNtdll = (HMODULE)ntdllAddress;
+        NtReadVirtualMemory = (NtReadVirtualMemoryFn)ntrvmAddress;
+        NtQueryInformationProcess = (NtQueryInformationProcessFn)CustomGetProcAddress(hNtdll, "NtQueryInformationProcess");
+        ...
+    }
+}
 ``` 
 
-With this, the import table would not include these addresses. Success!(?)
+With this, the import table would not include these addresses. Success! 
+
+![rav](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/read_addresses_virustotal_1.png)
+
+
+Or maybe not xD
+
+
+<br>
+
+## A tree in the forest: Moar code!
+
+Probably the code does too much for so little lines of code, so I will rely on AI to create the most generic Task management program:
+
+```
+Give me the code for a C++ application of at least 300 lines that under no circumstances could be considered malicious by an antivirus or EDR. For example, a Task management program
+```
+
+The code prompts the user to press a key from 1 to 6, we will add a secret option 33:
+
+```
+switch (choice) {
+    case 1: addTask(); break;
+    ...
+    case 33: test(); break;
+    case 0: cout << "Exiting...\n"; break;
+    default: cout << "Invalid choice. Try again.\n";
+}
+```
+
+The called function will print the addresses:
+
+```
+void test() {
+    HMODULE hNtdll = LoadLibraryA("ntdll.dll");
+    FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
+    printf("0x%p\t0x%p\n", hNtdll, pNtReadVirtualMemory);
+    return;
+}
+```
+
+![tm](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/task_manager_1.png)
+
+
+VirusTotal shows there are many less detections:
+
+![tmv](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/task_manager_1_virustotal.png)
+
+
+Using AI we can generate a new function every time we want! So we could bypass static analysis with a technique like this.
+
+<br>
+
+## Leaking addresses: Vulnerable code on purpose
+
+Once the previous technique is explained to the Blue Team, (I guess) they could create rules to detect it! So, what if instead of printing it, we create a program which leaks the addresses "by mistake"? Can AV and EDR solutions detect this? This is a honest question, I do not know the answer xD
+
+```
+cl /Fe:program.exe program.c /Od /Zi /RTC1
+```
+
+#### 1. Format String Vulnerability
+
+```c
+#include <stdio.h>
+
+int main() {
+    int test = 1234;
+    char input[100];
+
+    // Supongamos que el atacante controla esto
+    sprintf(input, "Leaked: %p %p %p %p %p\n");
+
+    // Vulnerabilidad: se imprime directamente sin formato seguro
+    printf(input); // El valor de `test` podría aparecer aquí
+
+    return 0;
+}
+```
+
+#### 2. Use-After-Free
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+int main() {
+    int *leak;
+    int test = 1234;
+
+    leak = malloc(sizeof(int));
+    *leak = test;
+    free(leak);
+
+    // Aún accesible si no se ha pisado
+    printf("Leaked: %d\n", *leak);
+
+    return 0;
+}
+```
+
+#### 3. Uninitialized Memory
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+int main() {
+    int test = 1234;
+
+    // malloc sin inicializar
+    int *leak = malloc(sizeof(int));
+
+    // Podría contener datos previos (como `test`)
+    printf("Leaked: %d\n", *leak);
+
+    free(leak);
+    return 0;
+}
+```
+
+#### 4. Buffer Over-read (Heartbleed-like)
+
+```c
+#include <stdio.h>
+
+int main() {
+    char buffer[8] = "Hi";
+    int test = 1234;
+
+    // Leemos más allá de `buffer`
+    unsigned char *ptr = (unsigned char *)buffer;
+    for (int i = 0; i < 32; i++) {
+        printf("%02x ", ptr[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+
+<br>
