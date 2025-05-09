@@ -28,17 +28,17 @@ Some of these projects have been:
 - [NativeNtdllRemap](https://github.com/ricardojoserf/NativeNtdllRemap): Remap ntdll.dll using a suspended process.
 
 
-However, it bothered me to have all the necessary functions in the import table of the binary, because this could hint towards the true intentions of the compiled binary - you know, importing NtOpenProcessToken and NtAdjustPrivilegesToken might look suspicious :)
+However, it bothered me to have all the necessary functions in the import table of the binary, because this could hint towards the true intentions of the compiled binary - you know, importing *NtOpenProcessToken* and *NtAdjustPrivilegesToken* might look suspicious :)
 
-To solve this, I decided to use dynamic API resolution by creating functions mimicking GetModuleHandle and GetProcAddress. As a short reminder, GetModuleHandle returns the address of a loaded DLL given the library name (LoadLibrary works too but I would only use it if the DLL is not already loaded in the process) and GetProcAddress returns the address of a function given the DLL address and the function name. """The ntdll.dll library is always the first DLL to get loaded in a process and it gets always loaded, so we can simplify this problem to GetModuleHandle + GetProcAddress when we work with NTAPIs."""
+To solve this, I decided to use dynamic API resolution by creating functions mimicking *GetModuleHandle* and *GetProcAddress*. As a short reminder, *GetModuleHandle* returns the address of a loaded DLL given the library name (*LoadLibrary* works too but I would only use it if the DLL is not already loaded in the process) and *GetProcAddress* returns the address of a function given the DLL address and the function name. <!--The ntdll.dll library is always the first DLL to get loaded in a process and it gets always loaded, so we can simplify this problem to GetModuleHandle + GetProcAddress when we work with NTAPIs.-->
 
 By walking the PEB it is possible to get this functionality using custom implementations, and you can do it using only functions in ntdll.dll:
 
-- CustomGetModuleHandle requires NtQueryInformationProcess and NtReadVirtualMemory
+- CustomGetModuleHandle requires *NtQueryInformationProcess* and *NtReadVirtualMemory*
 
-- CustomGetProcAddress requires only NtReadVirtualMemory
+- CustomGetProcAddress requires only *NtReadVirtualMemory*
 
-The problem here: you need some way to resolve at least ntdll.dll address and NtReadVirtualMemory. With those 2 addresses, you can use CustomGetProcAddress to get the function address of any function in ntdll.dll. Or, resolving NtQueryInformationProcess, you can use CustomGetProcAddress to get the base address of any DLL using CustomGetModuleHandle, in case you are not sticking to using only NTAPIs (understandable hahaha).
+The problem here: you need some way to resolve at least ntdll.dll address and *NtReadVirtualMemory*. With those 2 addresses, you can use CustomGetProcAddress to get the function address of any function in ntdll.dll. Or, resolving *NtQueryInformationProcess*, you can use CustomGetProcAddress to get the base address of any DLL using CustomGetModuleHandle, in case you are not sticking to using only NTAPIs (understandable hahaha).
 
 In C, first the function delegates are defined:
 
@@ -105,15 +105,7 @@ int main(int argc, char* argv[]) {
 ![ra](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/read_addresses.png)
 
 
-We can simply hardcode the values in the code, making the previous code to look like this now:
-
-```
-HMODULE hNtdll = (HMODULE)0x00007FFABF8B0000;
-NtReadVirtualMemory = (NtReadVirtualMemoryFn)0x00007FFABF94D7B0;
-NtQueryInformationProcess = (NtQueryInformationProcessFn)CustomGetProcAddress(hNtdll, "NtQueryInformationProcess");
-``` 
-
-Or we can use input parameters:
+We can simply hardcode the values in the code, or we can use input parameters:
 
 ```
 int main(int argc, char* argv[]) {
@@ -130,13 +122,22 @@ int main(int argc, char* argv[]) {
 }
 ``` 
 
-With this, the import table would not include these addresses. Success! 
+With this, the import table would not include these addresses. Success... not:
 
 ![rav](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/read_addresses_virustotal_1.png)
 
+Before continuing, let's create a code that takes 4 input parameters:
 
-Or maybe not xD
+- DLL name
 
+- Function name
+
+- ntdll.dll address
+
+- NtReadVirtualMemory address
+
+```c
+```
 
 <br>
 
