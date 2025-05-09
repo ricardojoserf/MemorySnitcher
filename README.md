@@ -298,3 +298,64 @@ Let's add it to the Task Management code, which calls this function using the se
 ```
 
 <br>
+
+### Heap override
+
+```
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main() {
+    char *buffer = (char *)malloc(8);
+    strcpy(buffer, "leak");  // Copiamos un string pequeño
+
+    // Variables ahora también en heap (simulando datos sensibles contiguos)
+    long long *leakme1 = (long long *)malloc(sizeof(long long));
+    long long *leakme2 = (long long *)malloc(sizeof(long long));
+    *leakme1 = 0xAAAAAAAAAA;
+    *leakme2 = 0xBBBBBBBBBB;
+
+    // Lectura más allá del final del buffer
+    unsigned char *ptr = (unsigned char *)buffer;
+    for (int i = 16; i < 24; i++) {
+        printf("%02X", ptr[i]);
+    }
+    printf(" ");
+    for (int i = 24; i < 32; i++) {
+        printf("%02X", ptr[i]);
+    }
+    printf("\n");
+
+    // Limpieza
+    free(buffer);
+    free(leakme1);
+    free(leakme2);
+
+    return 0;
+}
+```
+
+### Stack/Heap Leak via Format String
+
+```
+#include <stdio.h>
+#include <stdlib.h>
+
+int main() {
+    // Heap variable
+    long long *leakme_heap = (long long *)malloc(sizeof(long long));
+    *leakme_heap = 0xABCDEFABCD;
+
+    // Stack variable
+    long long leakme_stack = 0xDEADBEEFDEAD;
+
+    // Vulnerable format string usage
+    char input[100];
+    sprintf(input, "%p %p %p %p %p %p %p %p\n");  // Controlled format string
+    printf(input);  // Unsafe: input is used directly as format string
+
+    free(leakme_heap);
+    return 0;
+}
+```
