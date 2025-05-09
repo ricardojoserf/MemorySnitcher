@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-- I use dynamic API resolution to avoid functions to appear in the import table of the binary, but it requires at least the ntdll.dll library and the *NtReadVirtualMemory* function addresses.
+- I use dynamic API resolution to avoid functions to appear in the Import Address Table of the binary, but it requires at least the ntdll.dll library and the *NtReadVirtualMemory* function addresses.
 
 - Using a separate application which just prints these addresses might look suspicious.
 
@@ -15,7 +15,7 @@
 
 ## Motivation
 
-Last months, I have made public some tools which use "only" lower-level functions in the ntdll.dll library. This DLL contains the lowest level functions in user mode because it interacts directly with ntoskrnl.exe, which is already kernel mode.
+Last months, I have made public some tools which use "only" lower-level functions in the ntdll.dll library, also known as NTAPIs. This DLL contains the lowest level functions in user mode because it interacts directly with ntoskrnl.exe, which is already kernel mode.
 
 Some of these projects have been:
 
@@ -28,19 +28,21 @@ Some of these projects have been:
 - [NativeNtdllRemap](https://github.com/ricardojoserf/NativeNtdllRemap): Remap ntdll.dll using a suspended process.
 
 
-However, it bothered me to have all the necessary functions in the import table of the binary, because this could hint towards the true intentions of the compiled binary - you know, importing *NtOpenProcessToken* and *NtAdjustPrivilegesToken* might look suspicious :)
+However, it bothered me to have all the necessary functions in the Import Address Table (IAT) of the binary, because this could hint towards the true intentions of the compiled binary - you know, importing *NtOpenProcessToken* and *NtAdjustPrivilegesToken* might look suspicious :)
 
-To solve this, I decided to use dynamic API resolution by creating functions mimicking *GetModuleHandle* and *GetProcAddress*. As a short reminder, *GetModuleHandle* returns the address of a loaded DLL given the library name (*LoadLibrary* works too but I would only use it if the DLL is not already loaded in the process) and *GetProcAddress* returns the address of a function given the DLL address and the function name. <!--The ntdll.dll library is always the first DLL to get loaded in a process and it gets always loaded, so we can simplify this problem to GetModuleHandle + GetProcAddress when we work with NTAPIs.-->
+To solve this, I decided to use dynamic API resolution by creating functions mimicking *GetModuleHandle* and *GetProcAddress*. *GetModuleHandle* returns the address of a loaded DLL given the library name (*LoadLibrary* works too but I would only use it if the DLL is not already loaded in the process) and *GetProcAddress* returns the address of a function given the DLL address and the function name. 
 
-By walking the PEB it is possible to get this functionality using custom implementations, and you can do it using only functions in ntdll.dll:
+By walking the PEB, it is possible to get this functionality with custom implementations and using only functions in ntdll.dll:
 
-- CustomGetModuleHandle requires *NtQueryInformationProcess* and *NtReadVirtualMemory*
+- Custom implementation of *GetModuleHandle* requires *NtQueryInformationProcess* and *NtReadVirtualMemory*
 
-- CustomGetProcAddress requires only *NtReadVirtualMemory*
+- Custom implementation of *CustomGetProcAddress* requires only *NtReadVirtualMemory*
 
-The problem here: you need some way to resolve at least ntdll.dll address and *NtReadVirtualMemory*. With those 2 addresses, you can use CustomGetProcAddress to get the function address of any function in ntdll.dll. Or, resolving *NtQueryInformationProcess*, you can use CustomGetProcAddress to get the base address of any DLL using CustomGetModuleHandle, in case you are not sticking to using only NTAPIs (understandable hahaha).
+The problem: you need some way to resolve at least ntdll.dll and *NtReadVirtualMemory*. With those 2 addresses, you can use CustomGetProcAddress to get the function address of any function in ntdll.dll. Or, resolving *NtQueryInformationProcess*, you can use CustomGetProcAddress to get the base address of any DLL using CustomGetModuleHandle, in case you are not sticking to using only NTAPIs.
 
-In C, first the function delegates are defined:
+The ntdll.dll library is always the first DLL to get loaded in a process and it gets always loaded, so we can use *GetModuleHandle* without the need for *LoadLibrary*.
+
+In C, the function delegates are defined at the top of the program:
 
 ```
 typedef NTSTATUS(WINAPI* NtReadVirtualMemoryFn)(HANDLE, PVOID, PVOID, SIZE_T, PSIZE_T);
@@ -50,44 +52,36 @@ NtQueryInformationProcessFn NtQueryInformationProcess;
 NtReadVirtualMemoryFn NtReadVirtualMemory;
 ```
 
-Then, resolving the function *NtQueryInformationProcess* would look like this:
+Then, the code to resolve the function *NtReadVirtualMemory* address is added to the main function:
 
 ```
 HMODULE hNtdll = GetModuleHandleA("ntdll.dll");
 NtReadVirtualMemory = (NtReadVirtualMemoryFn)GetProcAddress((HMODULE)hNtdll, "NtReadVirtualMemory");
-NtQueryInformationProcess = (NtQueryInformationProcessFn)CustomGetProcAddress(hNtdll, "NtQueryInformationProcess");
 ```
 
-With this code we would have *GetModuleHandleA* and *GetProcAddress* in the import table, very suspicious. Let's run PE-BEAR and see what the table looks like:
+After this, *NtQueryInformationProcess* would get resolved and then any function in any DLL. But we would have *GetModuleHandleA* and *GetProcAddress* in the IAT, which is suspicious. 
+
+Let's run PE-BEAR and check this:
 
 ![it1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nativentdllremap_import_table.png)
 
-There are 17 imported functions from Kernel32.dll, the first 2 in the list are those. 
 
-Regarding the other 15 functions, I created a very simple program to test if these always appear:
+There are 17 imported functions from Kernel32.dll, the first 2 in the list are the suspicious-looking ones. 
 
-```
-#include <iostream>
+Regarding the other 15 functions, these appear because the binary was compiled with the C Runtime (CRT) included, which embeds the necessary runtime support directly into the executable. 
 
-int main(int argc, char* argv[]) {
-    printf("Test");
-    return 0;
-}
-```
-
-And the same 15 functions appear in the import table, so it is not related to our code:
+I created a very simple program to test it, simply printing a message to the console, and those same 15 functions appear in the IAT:
 
 ![it2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/printf_program_import_table.png)
 
 
-This means the binary was compiled with the C Runtime (CRT) included, which embeds the necessary runtime support directly into the executable. There are many blogs about compiling without CRT and it is not my goal to do this: if I get only these functions in the import table I think it will be good enough.  
-
+There are many blogs about compiling without CRT and it is not my goal to do this. Also, maybe not having any function in the IAT looks even worse!
 
 <br>
 
-## First Approach
+## Approach 1: Print the addresses
 
-These addresses are just numbers, so there are some silly methods to use them, but these will change for every system. First, let's print the values: 
+The easiest way to obtain these addreses is just to print them: 
 
 ```
 #include <iostream>
@@ -104,46 +98,29 @@ int main(int argc, char* argv[]) {
 
 ![ra](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/read_addresses.png)
 
-
-We can simply hardcode the values in the code, or we can use input parameters:
-
-```
-int main(int argc, char* argv[]) {
-    if (argc == 3) {
-        char* endptr1;
-        char* endptr2;
-        uintptr_t ntdllAddr = (uintptr_t)strtoull(argv[1], &endptr1, 0);
-        uintptr_t ntrvmAddr = (uintptr_t)strtoull(argv[2], &endptr2, 0);            
-        HMODULE hNtdll = (HMODULE)ntdllAddress;
-        NtReadVirtualMemory = (NtReadVirtualMemoryFn)ntrvmAddress;
-        NtQueryInformationProcess = (NtQueryInformationProcessFn)CustomGetProcAddress(hNtdll, "NtQueryInformationProcess");
-        ...
-    }
-}
-``` 
-
-With this, the import table would not include these addresses. Success... not:
+But it does not look very OPSEC-like:
 
 ![rav](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/read_addresses_virustotal_1.png)
 
-Before continuing, let's create a code that takes 4 input parameters:
+However, these addresses are just numbers, so there are some silly methods to use them. 
 
-- DLL name
+Their values will change for every system reboot, so hardcoding them is not useful, but we can use the output from a program like *read_addresses.exe* as input parameters for our program.
 
-- Function name
-
-- ntdll.dll address
-
-- NtReadVirtualMemory address
+The file *resolve.c* contains the code to resolve the function in any DLL given four parameters: the DLL containing that function, the function name, ntdll.dll address and *NtReadVirtualMemory* address.
 
 ```c
 ```
 
+![r1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/resolve_1.png)
+
+We could not find an stealthy way to resolve these 2 addresses, but we know it is enough to send these 2 addresses as parameters to a program, and with that the program can resolve any function. Without functions in the IAT! 
+
 <br>
 
-## A tree in the forest: Moar code!
 
-Probably the code does too much for so little lines of code, so I will rely on AI to create the most generic Task management program:
+## Approach 2: Moar code!
+
+Probably the code does too much for so little lines of code, so I will rely on AI to create the most generic application (a Task Manager):
 
 ```
 Give me the code for a C++ application of at least 300 lines that under no circumstances could be considered malicious by an antivirus or EDR. For example, a Task management program
@@ -185,12 +162,11 @@ Using AI we can generate a new program every time we want, as huge and useless a
 
 <br>
 
-## Leaking addresses: Vulnerable code on purpose
+## Approach 3: Address leak by design
 
 Once the previous technique is explained to the Blue Team, (I guess) they could create rules to detect it! So, what if instead of printing it, we create a program which leaks the addresses "by mistake"? 
 
 Can AV and EDR solutions detect this? This is a honest question, I do not know the answer xD
-
 
 ### 1. Format String Vulnerability
 
