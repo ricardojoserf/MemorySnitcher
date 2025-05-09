@@ -2,6 +2,9 @@
 #include <stdio.h>
 
 int main() {
+    // long long leakme1 = 733007751850; // 0xAAAAAAAAAA
+    // long long leakme2 = 806308527035; // 0xBBBBBBBBBB
+    
     HMODULE hNtdll = LoadLibraryA("ntdll.dll");
     FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
     
