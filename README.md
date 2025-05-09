@@ -168,6 +168,7 @@ Once the previous technique is explained to the Blue Team, (I guess) they could 
 
 Can AV and EDR solutions detect this? This is a honest question, I do not know the answer xD
 
+
 ### 1. Format String Vulnerability
 
 This simple code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
@@ -221,7 +222,13 @@ Compile it again and get the addresses:
 
 ![fs2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_2.png)
 
---------------------------------------
+
+Let's add it to the Task Management code, which calls this function using the secret code 331:
+
+```c
+```
+
+<br>
 
 ### 2. Buffer Over-read (Heartbleed-like)
 
@@ -283,5 +290,11 @@ int main() {
 Compile it again and get the addresses:
 
 ![or2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_2.png)
+
+
+Let's add it to the Task Management code, which calls this function using the secret code 332:
+
+```c
+```
 
 <br>
