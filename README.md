@@ -1,6 +1,6 @@
 # MemorySnitcher
 
-## TL,DR - Does a poorly-coded application get detected?
+## TL;DR - Does a poorly-coded application get detected?
 
 - I use dynamic API resolution to avoid functions to appear in the import table of the binary, but it requires at least the ntdll.dll library and the *NtReadVirtualMemory* function addresses.
 
@@ -176,94 +176,212 @@ VirusTotal shows there are many less detections:
 
 Using AI we can generate a new function every time we want! So we could bypass static analysis with a technique like this.
 
+
 <br>
+
 
 ## Leaking addresses: Vulnerable code on purpose
 
 Once the previous technique is explained to the Blue Team, (I guess) they could create rules to detect it! So, what if instead of printing it, we create a program which leaks the addresses "by mistake"? Can AV and EDR solutions detect this? This is a honest question, I do not know the answer xD
 
-```
-cl /Fe:program.exe program.c /Od /Zi /RTC1
-```
 
-#### 1. Format String Vulnerability
+### 1. Format String Vulnerability
+
+This simple code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variable:
 
 ```c
 #include <stdio.h>
 
 int main() {
-    int test = 1234;
+    long long leakme1 = 733007751850; // 0xAAAAAAAAAA
+    long long leakme2 = 806308527035; // 0xBBBBBBBBBB
     char input[100];
+    sprintf(input, "%p %p %p %p\n");
+    printf(input);
+    
+    return 0;
+}
+```
 
-    // Supongamos que el atacante controla esto
-    sprintf(input, "Leaked: %p %p %p %p %p\n");
+Compile it like this:
 
-    // Vulnerabilidad: se imprime directamente sin formato seguro
-    printf(input); // El valor de `test` podría aparecer aquí
+```
+cl /Fe:format_string.exe format_string.c /Od /Zi /RTC1
+```
+
+And execute it:
+
+![fs1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_1.png)
+
+
+The values are leaked! Now it is time to implement this to leak the addresses:
+
+```c
+#include <windows.h>
+#include <stdio.h>
+
+int main() {
+    HMODULE hNtdll = LoadLibraryA("ntdll.dll");
+    FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
+    
+    long long leakme1 = (long long) hNtdll;
+    long long leakme2 = (long long) pNtReadVirtualMemory;
+    char input[100];
+    sprintf(input, "%p %p %p %p\n");
+    printf(input);
 
     return 0;
 }
 ```
 
-#### 2. Use-After-Free
+Compile it again and get the addresses:
+
+```
+cl /Fe:format_string_addresses.exe format_string_addresses.c /Od /Zi /RTC1
+```
+
+
+![fs2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_2.png)
+
+
+<br>
+
+### 2. Use-After-Free
+
+This simple code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variable:
 
 ```c
-#include <stdio.h>
 #include <stdlib.h>
 
 int main() {
-    int *leak;
-    int test = 1234;
+    long long leakme1 = 733007751850; // 0xAAAAAAAAAA
+    long long leakme2 = 806308527035; // 0xBBBBBBBBBB
+    long long *leak1;
+    long long *leak2;
 
-    leak = malloc(sizeof(int));
-    *leak = test;
-    free(leak);
-
-    // Aún accesible si no se ha pisado
-    printf("Leaked: %d\n", *leak);
+    leak1 = malloc(sizeof(long long));
+    leak2 = malloc(sizeof(long long));
+    *leak1 = leakme1;
+    *leak2 = leakme2;
+    printf("%llX %llX\n", *leak1, *leak2);
 
     return 0;
 }
 ```
 
-#### 3. Uninitialized Memory
+Compile it like this:
+
+```
+cl /Fe:use_after_free.exe use_after_free.c /Od /Zi /RTC1
+```
+
+And execute it:
+
+![uaf1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/use_after_free_1.png)
+
+
+The values are leaked! Now it is time to implement this to leak the addresses:
 
 ```c
-#include <stdio.h>
+#include <windows.h>
 #include <stdlib.h>
 
 int main() {
-    int test = 1234;
+    HMODULE hNtdll = LoadLibraryA("ntdll.dll");
+    FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
+    
+    long long leakme1 = (long long) hNtdll;
+    long long leakme2 = (long long) pNtReadVirtualMemory;
+    long long *leak1;
+    long long *leak2;
 
-    // malloc sin inicializar
-    int *leak = malloc(sizeof(int));
-
-    // Podría contener datos previos (como `test`)
-    printf("Leaked: %d\n", *leak);
-
-    free(leak);
+    leak1 = malloc(sizeof(long long));
+    leak2 = malloc(sizeof(long long));
+    *leak1 = leakme1;
+    *leak2 = leakme2;
+    printf("%llX %llX\n", *leak1, *leak2);
+    
     return 0;
 }
 ```
 
-#### 4. Buffer Over-read (Heartbleed-like)
+Compile it again and get the addresses:
+
+```
+cl /Fe:use_after_free_addresses.exe use_after_free_addresses.c /Od /Zi /RTC1
+```
+
+
+![uaf2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/use_after_free_2.png)
+
+<br>
+
+
+### 3. Buffer Over-read (Heartbleed-like)
+
+This simple code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variable:
 
 ```c
 #include <stdio.h>
 
 int main() {
-    char buffer[8] = "Hi";
-    int test = 1234;
-
-    // Leemos más allá de `buffer`
+    char buffer[8] = "leak";
+    long long leakme1 = 733007751850; // 0xAAAAAAAAAA
+    long long leakme2 = 806308527035; // 0xBBBBBBBBBB
     unsigned char *ptr = (unsigned char *)buffer;
-    for (int i = 0; i < 32; i++) {
-        printf("%02x ", ptr[i]);
-    }
+    
+    for (int i = 23; i >= 16; i--) { printf("%02X", ptr[i]); }
+    printf(" ");
+    for (int i = 31; i >= 24; i--) { printf("%02X", ptr[i]); }
     printf("\n");
-
+    
     return 0;
 }
 ```
+
+Compile it like this:
+
+```
+cl /Fe:overread.exe overread.c /Od /Zi /RTC1
+```
+
+And execute it:
+
+![or1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_1.png)
+
+
+The values are leaked! Now it is time to implement this to leak the addresses:
+
+```c
+#include <windows.h>
+#include <stdio.h>
+
+int main() {
+    HMODULE hNtdll = LoadLibraryA("ntdll.dll");
+    FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
+    
+    char buffer[8] = "leak";
+    long long leakme1 = (long long) hNtdll;
+    long long leakme2 = (long long) pNtReadVirtualMemory;
+    unsigned char *ptr = (unsigned char *)buffer;
+
+    for (int i = 23; i >= 16; i--) { printf("%02X", ptr[i]); }
+    printf(" ");
+    for (int i = 31; i >= 24; i--) { printf("%02X", ptr[i]); }
+    printf("\n");
+    
+    return 0;
+}
+```
+
+Compile it again and get the addresses:
+
+```
+cl /Fe:overread_addresses.exe overread_addresses.c /Od /Zi /RTC1
+```
+
+
+![or2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_2.png)
+
 
 <br>
