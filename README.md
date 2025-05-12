@@ -108,12 +108,9 @@ Their values will change for every system reboot, so hardcoding them is not usef
 
 The file *resolve.c* contains the code to resolve the function in any DLL given four parameters: the DLL containing that function, the function name, ntdll.dll address and *NtReadVirtualMemory* address.
 
-```c
-```
-
 ![r1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/resolve_1.png)
 
-We could not find an stealthy way to resolve these 2 addresses, but we know it is enough to send these 2 addresses as parameters to a program, and with that the program can resolve any function. Without functions in the IAT! 
+We could not find an stealthy way to resolve these 2 addresses, but we know it is enough to send these 2 addresses as parameters to a program, and with that the program can resolve any function. Without any extra function in the IAT! 
 
 <br>
 
@@ -294,6 +291,8 @@ int main() {
     return 0;
 }
 ```
+
+Compile it again and get the addresses:
 
 ![or2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_2.png)
 
