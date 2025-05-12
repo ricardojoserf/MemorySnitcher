@@ -18,7 +18,7 @@ Last months, I have made public some tools which use "only" lower-level function
 
 Some of these projects have been [NativeDump](https://github.com/ricardojoserf/NativeDump) and [TrickDump](https://github.com/ricardojoserf/TrickDump) to dump the LSASS process; [NativeBypassCredGuard](https://github.com/ricardojoserf/NativeBypassCredGuard) to patch Credential Guard; [NativeTokenImpersonate](https://github.com/ricardojoserf/NativeTokenImpersonate) to impersonate tokens and [NativeNtdllRemap](https://github.com/ricardojoserf/NativeNtdllRemap) to remap ntdll.dll.
 
-It bothered me to have all the necessary functions in the Import Address Table (IAT) of the binary, because this could hint towards the true intentions of the compiled binary, so I used dynamic API resolution. But using it, I could not avoid using *GetModuleHandle* and *GetProcAddress*, which are not ntdll.dll functions!
+It bothered me to have all the necessary functions in the Import Address Table (IAT) of the binary, because this could hint towards the true intentions of the compiled binary, so I implemented dynamic API resolution. However, using it, I could not avoid calling *GetModuleHandle* and *GetProcAddress* - and these are not ntdll.dll functions!
 
 <br>
 
@@ -28,9 +28,9 @@ To use dynamic API resolution, I created functions mimicking *GetModuleHandle* a
 
 By walking the PEB, it is possible to do this using only functions in ntdll.dll:
 
-- Custom implementation of *GetProcAddress* requires only *NtReadVirtualMemory*
+- Custom implementation of *GetProcAddress* requires only *NtReadVirtualMemory*.
 
-- Custom implementation of *GetModuleHandle* requires *NtReadVirtualMemory*, *NtQueryInformationProcess* and *RtlUnicodeStringToAnsiString*
+- Custom implementation of *GetModuleHandle* requires *NtReadVirtualMemory*, *NtQueryInformationProcess* and *RtlUnicodeStringToAnsiString*.
 
 The problem: you need some way to resolve at least ntdll.dll and *NtReadVirtualMemory*. With those 2 addresses, you can use your custom *GetProcAddress* to get the function address of any function in ntdll.dll. 
 
@@ -63,13 +63,11 @@ int main() {
 }
 ```
 
-
 - First, NtReadVirtualMemory address is calculated using *GetModuleHandleA* and *GetProcAddress*. The ntdll.dll library is the first one to get loaded in any process, so you would not need *LoadLibrary*.
 
 - *NtQueryInformationProcess* and *RtlUnicodeStringToAnsiString* get resolved with the custom implementation of *GetProcAddress*, using ntdll.dll base address.
 
 - Then, any function address in any DLL can be calculated dynamically using the custom implementation of *GetModuleHandle*.
-
 
 From this code, we find we only call *GetModuleHandleA* once to get ntdll.dll address; and *GetProcAddress* once to get *NtReadVirtualMemory* address. The rest of addresses can be calculated dynamically!
 
@@ -78,7 +76,6 @@ The problem is, even if we only call them once, we would have *GetModuleHandleA*
 Let's check it with PE-BEAR:
 
 ![it1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nativentdllremap_import_table.png)
-
 
 There are 17 imported functions from Kernel32.dll, the first 2 in the list are the suspicious-looking ones. 
 
@@ -91,6 +88,7 @@ There are many blogs about compiling without CRT so I will not do it here (also,
 These 2 addresses are just numbers, so could be hardcoded or used as input arguments to the program. But, how can we get these values?
 
 <br>
+
 
 ## Approach 1: Print the addresses directly
 
@@ -211,7 +209,6 @@ And execute it:
 
 ![fs1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_1.png)
 
-
 The values are leaked! Now it is time to leak the addresses:
 
 ```c
@@ -235,7 +232,6 @@ int main() {
 Compile it again and get the addresses:
 
 ![fs2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_2.png)
-
 
 Let's add it to the Task Management code, which calls this function using the secret code 33. Compile *taskmanager_format_string.c* and run it:
 
@@ -279,7 +275,6 @@ cl /Fe:leak_stack_overread.exe leak_stack_overread.c /Od /Zi /RTC1
 And execute it:
 
 ![or1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_1.png)
-
 
 The values are leaked! Now it is time to leak the addresses:
 
