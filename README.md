@@ -8,10 +8,9 @@
 
 - The proposal is using an application with any vulnerability which leaks memory addresses (on purpose).
 
-- Does a poorly-coded application get detected?
-
 
 <br>
+
 
 ## Motivation
 
@@ -30,52 +29,73 @@ Some of these projects have been:
 
 However, it bothered me to have all the necessary functions in the Import Address Table (IAT) of the binary, because this could hint towards the true intentions of the compiled binary - you know, importing *NtOpenProcessToken* and *NtAdjustPrivilegesToken* might look suspicious :)
 
+
+<br>
+
+## ntdll.dll and NtReadVirtualMemory for API resolution
+
 To solve this, I decided to use dynamic API resolution by creating functions mimicking *GetModuleHandle* and *GetProcAddress*. *GetModuleHandle* returns the address of a loaded DLL given the library name (*LoadLibrary* works too but I would only use it if the DLL is not already loaded in the process) and *GetProcAddress* returns the address of a function given the DLL address and the function name. 
 
 By walking the PEB, it is possible to get this functionality with custom implementations and using only functions in ntdll.dll:
 
-- Custom implementation of *GetModuleHandle* requires *NtQueryInformationProcess* and *NtReadVirtualMemory*
-
 - Custom implementation of *CustomGetProcAddress* requires only *NtReadVirtualMemory*
 
-The problem: you need some way to resolve at least ntdll.dll and *NtReadVirtualMemory*. With those 2 addresses, you can use CustomGetProcAddress to get the function address of any function in ntdll.dll. Or, resolving *NtQueryInformationProcess*, you can use CustomGetProcAddress to get the base address of any DLL using CustomGetModuleHandle, in case you are not sticking to using only NTAPIs.
+- Custom implementation of *GetModuleHandle* requires *NtReadVirtualMemory*, *NtQueryInformationProcess* and *RtlUnicodeStringToAnsiString*
 
-The ntdll.dll library is always the first DLL to get loaded in a process and it gets always loaded, so we can use *GetModuleHandle* without the need for *LoadLibrary*.
+The problem: you need some way to resolve at least ntdll.dll and *NtReadVirtualMemory*. With those 2 addresses, you can use your custom *GetProcAddress* to get the function address of any function in ntdll.dll. 
 
-In C, the function delegates are defined at the top of the program:
+And, resolving *NtQueryInformationProcess* and *RtlUnicodeStringToAnsiString*, you can use your custom *GetModuleHandle* to get the base address of any DLL, in case you are not sticking to using only NTAPIs.
+
+The way I did it until now is:
 
 ```c
+#include <windows.h>
+
+// First, the function delegates are defined at the top of the program:
 typedef NTSTATUS(WINAPI* NtReadVirtualMemoryFn)(HANDLE, PVOID, PVOID, SIZE_T, PSIZE_T);
 typedef NTSTATUS(WINAPI* NtQueryInformationProcessFn)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
 
 NtQueryInformationProcessFn NtQueryInformationProcess;
 NtReadVirtualMemoryFn NtReadVirtualMemory;
+
+int main() {
+    // NTAPI
+    HMODULE hNtdll = GetModuleHandleA("ntdll.dll");
+    NtReadVirtualMemory = (NtReadVirtualMemoryFn)GetProcAddress((HMODULE)hNtdll, "NtReadVirtualMemory");
+    void* pNtapi = CustomGetProcAddress(hNtdll, "NtClose");
+    
+    // Function in other DLL
+    NtQueryInformationProcess = (NtQueryInformationProcessFn)CustomGetProcAddress(hNtdll, "NtQueryInformationProcess");
+    RtlUnicodeStringToAnsiString = (RtlUnicodeStringToAnsiStringFn)CustomGetProcAddress(hNtdll, "RtlUnicodeStringToAnsiString");
+    uintptr_t hDLL = CustomGetModuleHandle((HANDLE)(-1), "kernel32.dll");
+    void* pFunction = CustomGetProcAddress(hDLL, "CloseHandle");
+    ...
+}
 ```
 
-Then, the code to resolve the function *NtReadVirtualMemory* address is added to the main function:
 
-```c
-HMODULE hNtdll = GetModuleHandleA("ntdll.dll");
-NtReadVirtualMemory = (NtReadVirtualMemoryFn)GetProcAddress((HMODULE)hNtdll, "NtReadVirtualMemory");
-```
+- First, NtReadVirtualMemory address is calculated using *GetModuleHandleA* and *GetProcAddress*. The ntdll.dll library is the first one to get loaded in any process, so you would not need *LoadLibrary*-
 
-After this, *NtQueryInformationProcess* would get resolved and then any function in any DLL. But we would have *GetModuleHandleA* and *GetProcAddress* in the IAT, which is suspicious. 
+- *NtQueryInformationProcess* and *RtlUnicodeStringToAnsiString* get resolved with the custom implementation of *GetProcAddress*, using ntdll.dll base address.
 
-Let's run PE-BEAR and check this:
+- Then, any function address in any DLL can be calculated dynamically using the custom implementation of *GetModuleHandle*.
+
+The problem is, with this code, we would have *GetModuleHandleA* and *GetProcAddress* in the IAT, which is suspicious. 
+
+Let's check it with PE-BEAR:
 
 ![it1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nativentdllremap_import_table.png)
 
 
 There are 17 imported functions from Kernel32.dll, the first 2 in the list are the suspicious-looking ones. 
 
-Regarding the other 15 functions, these appear because the binary was compiled with the C Runtime (CRT) included, which embeds the necessary runtime support directly into the executable. 
-
-I created a very simple program to test it, simply printing a message to the console, and those same 15 functions appear in the IAT:
+Regarding the other 15 functions, these appear because the binary was compiled with the C Runtime (CRT) included, which embeds the necessary runtime support directly into the executable. I created a very simple program to test it, and those same 15 functions appear in the IAT:
 
 ![it2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/printf_program_import_table.png)
 
+There are many blogs about compiling without CRT so I will not do it here (also, maybe not having any function in the IAT looks even worse).
 
-There are many blogs about compiling without CRT and it is not my goal to do this. Also, maybe not having any function in the IAT looks even worse!
+Now, how can we get these 2 addresses?
 
 <br>
 
@@ -159,7 +179,6 @@ VirusTotal shows there are many less detections:
 
 
 Using AI we can generate a new program every time we want, as huge and useless as needed! So we could bypass static analysis with a technique like this.
-
 
 <br>
 
