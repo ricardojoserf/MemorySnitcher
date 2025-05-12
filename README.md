@@ -2,11 +2,11 @@
 
 ## TL;DR
 
-- I use dynamic API resolution to avoid functions to appear in the Import Address Table of the binary, but it requires at least the ntdll.dll library and the *NtReadVirtualMemory* function addresses.
+- Using dynamic API resolution to avoid functions to appear in the IAT still requires the ntdll.dll and *NtReadVirtualMemory* addresses.
 
-- Using a separate application which just prints these addresses might look suspicious.
+- A separate application which just prints these addresses looks suspicious.
 
-- The proposal is using an application with any vulnerability which leaks memory addresses (on purpose).
+- Using an application with any vulnerability which leaks memory addresses (on purpose) seems to go undetected.
 
 
 <br>
@@ -14,27 +14,17 @@
 
 ## Motivation
 
-Last months, I have made public some tools which use "only" lower-level functions in the ntdll.dll library, also known as NTAPIs. This DLL contains the lowest level functions in user mode because it interacts directly with ntoskrnl.exe, which is already kernel mode.
+Last months, I have made public some tools which use "only" lower-level functions in the ntdll.dll library, also known as NTAPIs. This DLL contains the lowest level functions in user-mode because it interacts directly with *ntoskrnl.exe*, which is already kernel-mode.
 
-Some of these projects have been:
+Some of these projects have been [NativeDump](https://github.com/ricardojoserf/NativeDump) and [TrickDump](https://github.com/ricardojoserf/TrickDump) to dump the LSASS process; [NativeBypassCredGuard](https://github.com/ricardojoserf/NativeBypassCredGuard) to patch Credential Guard; [NativeTokenImpersonate](https://github.com/ricardojoserf/NativeTokenImpersonate) to impersonate tokens and [NativeNtdllRemap](https://github.com/ricardojoserf/NativeNtdllRemap) to remap ntdll.dll.
 
-- [NativeDump](https://github.com/ricardojoserf/NativeDump) and [TrickDump](https://github.com/ricardojoserf/TrickDump): To dump the LSASS process.
-
-- [NativeBypassCredGuard](https://github.com/ricardojoserf/NativeBypassCredGuard): To patch Credential Guard.
-
-- [NativeTokenImpersonate](https://github.com/ricardojoserf/NativeTokenImpersonate): To impersonate tokens.
-
-- [NativeNtdllRemap](https://github.com/ricardojoserf/NativeNtdllRemap): Remap ntdll.dll using a suspended process.
-
-
-However, it bothered me to have all the necessary functions in the Import Address Table (IAT) of the binary, because this could hint towards the true intentions of the compiled binary - you know, importing *NtOpenProcessToken* and *NtAdjustPrivilegesToken* might look suspicious :)
-
+It bothered me to have all the necessary functions in the Import Address Table (IAT) of the binary, because this could hint towards the true intentions of the compiled binary, so I used dynamic API resolution. But using it, I could not avoid using *GetModuleHandle* and *GetProcAddress*, which are not ntdll.dll functions!
 
 <br>
 
 ## ntdll.dll and NtReadVirtualMemory for API resolution
 
-To solve this, I decided to use dynamic API resolution by creating functions mimicking *GetModuleHandle* and *GetProcAddress*. *GetModuleHandle* returns the address of a loaded DLL given the library name (*LoadLibrary* works too but I would only use it if the DLL is not already loaded in the process) and *GetProcAddress* returns the address of a function given the DLL address and the function name. 
+To use dynamic API resolution, I created functions mimicking *GetModuleHandle* and *GetProcAddress*. *GetModuleHandle* returns the address of a loaded DLL given the library name (*LoadLibrary* works too but I would only use it if the DLL is not already loaded in the process) and *GetProcAddress* returns the address of a function given the DLL address and the function name. 
 
 By walking the PEB, it is possible to do this using only functions in ntdll.dll:
 
