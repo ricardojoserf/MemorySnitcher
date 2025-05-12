@@ -36,7 +36,7 @@ However, it bothered me to have all the necessary functions in the Import Addres
 
 To solve this, I decided to use dynamic API resolution by creating functions mimicking *GetModuleHandle* and *GetProcAddress*. *GetModuleHandle* returns the address of a loaded DLL given the library name (*LoadLibrary* works too but I would only use it if the DLL is not already loaded in the process) and *GetProcAddress* returns the address of a function given the DLL address and the function name. 
 
-By walking the PEB, it is possible to get this functionality with custom implementations and using only functions in ntdll.dll:
+By walking the PEB, it is possible to do this using only functions in ntdll.dll:
 
 - Custom implementation of *GetProcAddress* requires only *NtReadVirtualMemory*
 
