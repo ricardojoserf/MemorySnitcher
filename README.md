@@ -241,6 +241,12 @@ cl /Fe:taskmanager_format_string.exe taskmanager_format_string.cpp /Od /Zi /RTC1
 
 ![tm2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/task_manager_2.png)
 
+Now it looks much more OPSEC-safe:
+
+![tm2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/refs/heads/master/images/memorysnitcher/task_manager_2_virustotal.png)
+
+The rest of the examples offered similar results. If you compile the programs and upload them to Virustotal you might find it is flagged by some vendors, so create a new useless application using AI!
+
 <br>
 
 
