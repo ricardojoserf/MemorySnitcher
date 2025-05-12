@@ -38,7 +38,7 @@ To solve this, I decided to use dynamic API resolution by creating functions mim
 
 By walking the PEB, it is possible to get this functionality with custom implementations and using only functions in ntdll.dll:
 
-- Custom implementation of *CustomGetProcAddress* requires only *NtReadVirtualMemory*
+- Custom implementation of *GetProcAddress* requires only *NtReadVirtualMemory*
 
 - Custom implementation of *GetModuleHandle* requires *NtReadVirtualMemory*, *NtQueryInformationProcess* and *RtlUnicodeStringToAnsiString*
 
@@ -74,13 +74,16 @@ int main() {
 ```
 
 
-- First, NtReadVirtualMemory address is calculated using *GetModuleHandleA* and *GetProcAddress*. The ntdll.dll library is the first one to get loaded in any process, so you would not need *LoadLibrary*-
+- First, NtReadVirtualMemory address is calculated using *GetModuleHandleA* and *GetProcAddress*. The ntdll.dll library is the first one to get loaded in any process, so you would not need *LoadLibrary*.
 
 - *NtQueryInformationProcess* and *RtlUnicodeStringToAnsiString* get resolved with the custom implementation of *GetProcAddress*, using ntdll.dll base address.
 
 - Then, any function address in any DLL can be calculated dynamically using the custom implementation of *GetModuleHandle*.
 
-The problem is, with this code, we would have *GetModuleHandleA* and *GetProcAddress* in the IAT, which is suspicious. 
+
+From this code, we find we only call *GetModuleHandleA* once to get ntdll.dll address; and *GetProcAddress* once to get *NtReadVirtualMemory* address. The rest of addresses can be calculated dynamically!
+
+The problem is, even if we only call them once, we would have *GetModuleHandleA* and *GetProcAddress* functions in the Import Address Table of the binary, which can be considered suspicious. 
 
 Let's check it with PE-BEAR:
 
@@ -95,11 +98,11 @@ Regarding the other 15 functions, these appear because the binary was compiled w
 
 There are many blogs about compiling without CRT so I will not do it here (also, maybe not having any function in the IAT looks even worse).
 
-Now, how can we get these 2 addresses?
+These 2 addresses are just numbers, so could be hardcoded or used as input arguments to the program. But, how can we get these values?
 
 <br>
 
-## Approach 1: Print the addresses
+## Approach 1: Print the addresses directly
 
 The easiest way to obtain these addreses is just to print them: 
 
@@ -181,6 +184,7 @@ VirusTotal shows there are many less detections:
 Using AI we can generate a new program every time we want, as huge and useless as needed! So we could bypass static analysis with a technique like this.
 
 <br>
+
 
 ## Approach 3: Address leak by design
 
@@ -324,7 +328,6 @@ cl /Fe:taskmanager_stack_overread.exe taskmanager_stack_overread.cpp /Od /Zi /RT
 ![tm3](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/task_manager_3.png)
 
 <br>
-
 
 
 ### 3.3. Heap override
