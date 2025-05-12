@@ -149,6 +149,10 @@ void test() {
 }
 ```
 
+```c
+cl /Fe:taskmanager_print_addresses.exe taskmanager_print_addresses.cpp /Od /Zi /RTC1
+```
+
 ![tm](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/task_manager_1.png)
 
 
@@ -169,7 +173,7 @@ Once the previous technique is explained to the Blue Team, (I guess) they could 
 Can AV and EDR solutions detect this? This is a honest question, I do not know the answer xD
 
 
-### 1. Format String Vulnerability
+### 3.1. Format String Vulnerability
 
 This simple code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
 
@@ -190,7 +194,7 @@ int main() {
 Compile it like this:
 
 ```
-cl /Fe:leak_formatstring.exe leak_formatstring.c /Od /Zi /RTC1
+cl /Fe:leak_format_string.exe leak_format_string.c /Od /Zi /RTC1
 ```
 
 And execute it:
@@ -223,14 +227,18 @@ Compile it again and get the addresses:
 ![fs2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_2.png)
 
 
-Let's add it to the Task Management code, which calls this function using the secret code 331:
+Let's add it to the Task Management code, which calls this function using the secret code 33. Compile and run *taskmanager_format_string.c*:
 
 ```c
+cl /Fe:taskmanager_format_string.exe taskmanager_format_string.cpp /Od /Zi /RTC1
 ```
+
+![tm2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/task_manager_2.png)
 
 <br>
 
-### 2. Buffer Over-read (Heartbleed-like)
+
+### 3.2. Stack Over-read
 
 This simple code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
 
@@ -255,7 +263,7 @@ int main() {
 Compile it like this:
 
 ```
-cl /Fe:leak_overread.exe leak_overread.c /Od /Zi /RTC1
+cl /Fe:leak_stack_overread.exe leak_stack_overread.c /Od /Zi /RTC1
 ```
 
 And execute it:
@@ -287,75 +295,93 @@ int main() {
 }
 ```
 
-Compile it again and get the addresses:
-
-![or2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_2.png)
-
-
-Let's add it to the Task Management code, which calls this function using the secret code 332:
+Let's add it to the Task Management code, which calls this function using the secret code 33. Compile and run *taskmanager_stack_overread.c*:
 
 ```c
+cl /Fe:taskmanager_stack_overread.exe taskmanager_stack_overread.cpp /Od /Zi /RTC1
 ```
+
+![tm3](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/task_manager_3.png)
 
 <br>
 
-### Heap override
 
-```
+
+### 3.3. Heap override
+
+This simple code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
+
+```c
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 int main() {
-    char *buffer = (char *)malloc(8);
-    strcpy(buffer, "leak");  // Copiamos un string pequeño
-
-    // Variables ahora también en heap (simulando datos sensibles contiguos)
-    long long *leakme1 = (long long *)malloc(sizeof(long long));
-    long long *leakme2 = (long long *)malloc(sizeof(long long));
-    *leakme1 = 0xAAAAAAAAAA;
+    char *buffer = (char *)malloc(32);
+    strcpy(buffer, "leak");
+    long long *leakme1 = (long long *)(buffer + 16);
+    long long *leakme2 = (long long *)(buffer + 24);
+    *leakme1 = 0xABCDEFABCD;
     *leakme2 = 0xBBBBBBBBBB;
 
-    // Lectura más allá del final del buffer
-    unsigned char *ptr = (unsigned char *)buffer;
-    for (int i = 16; i < 24; i++) {
-        printf("%02X", ptr[i]);
-    }
+    for (int i = 23; i >= 16; i--) { printf("%02X", (unsigned char)buffer[i]); }
     printf(" ");
-    for (int i = 24; i < 32; i++) {
-        printf("%02X", ptr[i]);
-    }
+    for (int i = 31; i >= 24; i--) { printf("%02X", (unsigned char)buffer[i]); }
     printf("\n");
 
-    // Limpieza
     free(buffer);
-    free(leakme1);
-    free(leakme2);
-
     return 0;
 }
 ```
 
-### Stack/Heap Leak via Format String
+Compile it like this:
 
 ```
+cl /Fe:leak_heap_overread.exe leak_heap_overread.c /Od /Zi /RTC1
+```
+
+And execute it:
+
+![hor1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/heap_overread_1.png)
+
+
+The values are leaked! Now it is time to leak the addresses:
+
+```c
+#include <windows.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 int main() {
-    // Heap variable
-    long long *leakme_heap = (long long *)malloc(sizeof(long long));
-    *leakme_heap = 0xABCDEFABCD;
+    HMODULE hNtdll = LoadLibraryA("ntdll.dll");
+    FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
 
-    // Stack variable
-    long long leakme_stack = 0xDEADBEEFDEAD;
+    char *buffer = (char *)malloc(32);
+    strcpy(buffer, "leak");
+    long long *leakme1 = (long long *)(buffer + 16);
+    long long *leakme2 = (long long *)(buffer + 24);
+    *leakme1 = hNtdll;
+    *leakme2 = pNtReadVirtualMemory;
 
-    // Vulnerable format string usage
-    char input[100];
-    sprintf(input, "%p %p %p %p %p %p %p %p\n");  // Controlled format string
-    printf(input);  // Unsafe: input is used directly as format string
+    for (int i = 23; i >= 16; i--) { printf("%02X", (unsigned char)buffer[i]); }
+    printf(" ");
+    for (int i = 31; i >= 24; i--) { printf("%02X", (unsigned char)buffer[i]); }
+    printf("\n");
 
-    free(leakme_heap);
     return 0;
 }
 ```
+
+Compile it again and get the addresses:
+
+![hor2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/heap_overread_2.png)
+
+
+Let's add it to the Task Management code, which calls this function using the secret code 33. Compile and run *taskmanager_heao_overread.c*:
+
+```c
+cl /Fe:taskmanager_heap_overread.exe taskmanager_heap_overread.cpp /Od /Zi /RTC1
+```
+
+![tm4](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/task_manager_4.png)
+
+<br>
