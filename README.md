@@ -44,7 +44,7 @@ The ntdll.dll library is always the first DLL to get loaded in a process and it 
 
 In C, the function delegates are defined at the top of the program:
 
-```
+```c
 typedef NTSTATUS(WINAPI* NtReadVirtualMemoryFn)(HANDLE, PVOID, PVOID, SIZE_T, PSIZE_T);
 typedef NTSTATUS(WINAPI* NtQueryInformationProcessFn)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
 
@@ -54,7 +54,7 @@ NtReadVirtualMemoryFn NtReadVirtualMemory;
 
 Then, the code to resolve the function *NtReadVirtualMemory* address is added to the main function:
 
-```
+```c
 HMODULE hNtdll = GetModuleHandleA("ntdll.dll");
 NtReadVirtualMemory = (NtReadVirtualMemoryFn)GetProcAddress((HMODULE)hNtdll, "NtReadVirtualMemory");
 ```
@@ -83,7 +83,7 @@ There are many blogs about compiling without CRT and it is not my goal to do thi
 
 The easiest way to obtain these addreses is just to print them: 
 
-```
+```c
 #include <iostream>
 #include <windows.h>
 
@@ -128,7 +128,7 @@ Give me the code for a C++ application of at least 300 lines that under no circu
 
 The code prompts the user to press a key from 1 to 6, we will add a secret option 33:
 
-```
+```c
 switch (choice) {
     case 1: addTask(); break;
     ...
@@ -140,7 +140,7 @@ switch (choice) {
 
 The called function will print the addresses:
 
-```
+```c
 void test() {
     HMODULE hNtdll = LoadLibraryA("ntdll.dll");
     FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
@@ -149,7 +149,7 @@ void test() {
 }
 ```
 
-```c
+```
 cl /Fe:taskmanager_print_addresses.exe taskmanager_print_addresses.cpp /Od /Zi /RTC1
 ```
 
@@ -227,9 +227,9 @@ Compile it again and get the addresses:
 ![fs2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_2.png)
 
 
-Let's add it to the Task Management code, which calls this function using the secret code 33. Compile and run *taskmanager_format_string.c*:
+Let's add it to the Task Management code, which calls this function using the secret code 33. Compile *taskmanager_format_string.c* and run it:
 
-```c
+```
 cl /Fe:taskmanager_format_string.exe taskmanager_format_string.cpp /Od /Zi /RTC1
 ```
 
@@ -295,9 +295,11 @@ int main() {
 }
 ```
 
-Let's add it to the Task Management code, which calls this function using the secret code 33. Compile and run *taskmanager_stack_overread.c*:
+![or2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_2.png)
 
-```c
+Let's add it to the Task Management code, which calls this function using the secret code 33. Compile *taskmanager_stack_overread.c* and run it:
+
+```
 cl /Fe:taskmanager_stack_overread.exe taskmanager_stack_overread.cpp /Od /Zi /RTC1
 ```
 
@@ -376,9 +378,9 @@ Compile it again and get the addresses:
 ![hor2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/heap_overread_2.png)
 
 
-Let's add it to the Task Management code, which calls this function using the secret code 33. Compile and run *taskmanager_heao_overread.c*:
+Let's add it to the Task Management code, which calls this function using the secret code 33. Compile *taskmanager_heao_overread.c* and run it:
 
-```c
+```
 cl /Fe:taskmanager_heap_overread.exe taskmanager_heap_overread.cpp /Od /Zi /RTC1
 ```
 
