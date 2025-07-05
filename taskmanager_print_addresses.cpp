@@ -180,7 +180,7 @@ public:
     void test() {
         HMODULE hNtdll = LoadLibraryA("ntdll.dll");
         FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
-        printf("0x%p\t0x%p\n", hNtdll, pNtReadVirtualMemory);
+        printf("0x%p\n", pNtReadVirtualMemory);
         return;
     }
 

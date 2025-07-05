@@ -184,15 +184,10 @@ public:
         char *buffer = (char *)malloc(32);
         strcpy(buffer, "leak");
         uintptr_t *leakme1 = (uintptr_t *)(buffer + 16);
-        uintptr_t *leakme2 = (uintptr_t *)(buffer + 24);
-        *leakme1 = (uintptr_t)hNtdll;
-        *leakme2 = (uintptr_t)pNtReadVirtualMemory;
-
+        *leakme1 = (uintptr_t)pNtReadVirtualMemory;
+        
         for (int i = 23; i >= 16; i--) { printf("%02X", (unsigned char)buffer[i]); }
-        printf(" ");
-        for (int i = 31; i >= 24; i--) { printf("%02X", (unsigned char)buffer[i]); }
-        printf("\n");
-
+        
         return;
     }
 
