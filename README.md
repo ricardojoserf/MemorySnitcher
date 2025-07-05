@@ -2,9 +2,9 @@
 
 ## TL;DR
 
-- Using dynamic API resolution to avoid functions appearing in the IAT still requires the ntdll.dll and *NtReadVirtualMemory* addresses.
+- Using dynamic API resolution to avoid functions appearing in the IAT requires only the *NtReadVirtualMemory* address.
 
-- A separate application which just prints these addresses may look suspicious.
+- A separate application which just prints the address may look suspicious.
 
 - Using an application with any vulnerability which leaks memory addresses (on purpose) may be stealthier.
 
@@ -21,9 +21,11 @@
 
 3. [Approach 1: Print the addresses directly](#approach-1-print-the-addresses-directly)
 
-4. [Approach 2: More code!](#approach-2-more-code)
+4. [Approach 2: NtReadVirtualMemory is more than enough](#approach-2-ntreadvirtualmemory-is-more-than-enough)
 
-5. [Approach 3: Address leak by design](#approach-3-address-leak-by-design)
+5. [Approach 3: More code!](#approach-3-more-code)
+
+6. [Approach 4: Address leak by design](#approach-4-address-leak-by-design)
 
    - [Leak 1: Format String Vulnerability](#leak-1-format-string-vulnerability)
 
@@ -31,9 +33,9 @@
 
    - [Leak 3: Heap override](#leak-3-heap-override)
 
-6. [Putting it into practice: NativeBypassCredGuard example](#putting-it-into-practice-nativebypasscredguard-example)
+7. [Putting it into practice: NativeBypassCredGuard example](#putting-it-into-practice-nativebypasscredguard-example)
 
-7. [Conclusion](#conclusion)
+8. [Conclusion](#conclusion)
 
 <br>
 
@@ -60,7 +62,7 @@ By walking the PEB, it is possible to do this using only functions in ntdll.dll:
 
 - Custom implementation of *GetModuleHandle* requires *NtReadVirtualMemory*, *NtQueryInformationProcess* and *RtlUnicodeStringToAnsiString*.
 
-The problem: you need some way to resolve at least ntdll.dll and *NtReadVirtualMemory*. With those two addresses, you can use your custom implementation of *GetProcAddress* to get the function address of any function in ntdll.dll. 
+The problem: you need some way to resolve at least *NtReadVirtualMemory*, and for that you need the address of ntdll.dll. With those two addresses, you can use your custom implementation of *GetProcAddress* to get the function address of any function in ntdll.dll. 
 
 And, resolving *NtQueryInformationProcess* and *RtlUnicodeStringToAnsiString*, you can use your custom *GetModuleHandle* to get the base address of any DLL, in case you are not sticking to using only NTAPIs.
 
@@ -146,18 +148,31 @@ It is straightforward, but not very OPSEC-safe:
 
 Their values will change for every system reboot, so hardcoding them is not useful, but we can use the output from a program like *read_addresses.exe* as input parameters for our program.
 
-The file *resolve.c* contains the code to resolve the function in any DLL given four parameters: the DLL containing that function, the function name, the ntdll.dll address and the *NtReadVirtualMemory* address.
+
+
+
+## Approach 2: NtReadVirtualMemory is more than enough
+
+After some tests, I found that the ntdll.dll base address can be bruteforced given the *NtReadVirtualMemory* address. For example, if the function address is 0x7FFE5424D7B0, the module's base address can be any value from 0x7FFE54100000 to 0x7FFE542D0000. So I created a small script to test all addresses like 0x7FFE54100000, 0x7FFE54120000,... , 0x7FFE541F0000, 0x7FFE54200000, 0x7FFE54210000,... , 0x7FFE542F0000.   
+
+The file *resolve.c* contains the code to resolve the function in any DLL given three parameters: 
+
+- The DLL containing that function
+
+- The function name
+
+- The *NtReadVirtualMemory* address.
 
 ![r1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/resolve_1.png)
 
-We could not find a stealthy way to resolve these 2 addresses, but we know it is enough to send these 2 addresses as parameters to a program, and with that the program can resolve any function. And without adding any extra functions to the IAT! 
+We could not find a stealthy way to resolve these 2 addresses, but we know it is enough to use only 1. Also, that we can use this function address as input parameter to a program, which is enough for the program to resolve any function. And without adding any extra functions to the IAT! 
 
 <br>
 
 
 
 
-## Approach 2: More code!
+## Approach 3: More code!
 
 The code probably does too much for so few lines of code, so I will rely on AI to create the most generic application (a Task Management program):
 
@@ -183,7 +198,7 @@ The called function will print the addresses:
 void test() {
     HMODULE hNtdll = LoadLibraryA("ntdll.dll");
     FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
-    printf("0x%p\t0x%p\n", hNtdll, pNtReadVirtualMemory);
+    printf("0x%p\n", pNtReadVirtualMemory);
     return;
 }
 ```
@@ -209,7 +224,7 @@ Using AI we can generate a new program every time we want, as huge and useless a
 
 
 
-## Approach 3: Address leak by design
+## Approach 4: Address leak by design
 
 Once the previous technique is explained to the Blue Team, (I guess) they could create rules to detect it! So, what if instead of printing it, we create a program which leaks the addresses "by mistake" (but not really)? Will AV and EDR solutions detect this?
 
@@ -242,7 +257,7 @@ cl /Fe:format_string.exe leak_format_string.c /Od /Zi /RTC1
 
 ![fs1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_1.png)
 
-The values are leaked! Now it is time to leak the addresses:
+The values are leaked! Now it is time to leak the address:
 
 ```c
 #include <windows.h>
@@ -252,10 +267,9 @@ int main() {
     HMODULE hNtdll = LoadLibraryA("ntdll.dll");
     FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
     
-    long long leakme1 = (long long) hNtdll;
-    long long leakme2 = (long long) pNtReadVirtualMemory;
+    long long leakme1 = (long long) pNtReadVirtualMemory;
     char input[100];
-    sprintf(input, "%p %p %p %p\n");
+    sprintf(input, "%p %p %p\n");
     printf(input);
 
     return 0;
@@ -330,13 +344,14 @@ int main() {
     FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
     
     char buffer[8] = "leak";
-    long long leakme1 = (long long) hNtdll;
-    long long leakme2 = (long long) pNtReadVirtualMemory;
+    // long long leakme1 = (long long) hNtdll;
+    // long long leakme2 = (long long) pNtReadVirtualMemory;
+    long long leakme1 = pNtReadVirtualMemory;
     unsigned char *ptr = (unsigned char *)buffer;
 
     for (int i = 23; i >= 16; i--) { printf("%02X", ptr[i]); }
-    printf(" ");
-    for (int i = 31; i >= 24; i--) { printf("%02X", ptr[i]); }
+    // printf(" ");
+    // for (int i = 31; i >= 24; i--) { printf("%02X", ptr[i]); }
     printf("\n");
     
     return 0;
@@ -412,14 +427,16 @@ int main() {
 
     char *buffer = (char *)malloc(32);
     strcpy(buffer, "leak");
+    // long long *leakme1 = (long long *)(buffer + 16);
+    // long long *leakme2 = (long long *)(buffer + 24);
+    // *leakme1 = hNtdll;
+    // *leakme2 = pNtReadVirtualMemory;
     long long *leakme1 = (long long *)(buffer + 16);
-    long long *leakme2 = (long long *)(buffer + 24);
-    *leakme1 = hNtdll;
-    *leakme2 = pNtReadVirtualMemory;
+    *leakme1 = pNtReadVirtualMemory;
 
     for (int i = 23; i >= 16; i--) { printf("%02X", (unsigned char)buffer[i]); }
-    printf(" ");
-    for (int i = 31; i >= 24; i--) { printf("%02X", (unsigned char)buffer[i]); }
+    // printf(" ");
+    // for (int i = 31; i >= 24; i--) { printf("%02X", (unsigned char)buffer[i]); }
     printf("\n");
 
     return 0;
