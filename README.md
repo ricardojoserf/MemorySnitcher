@@ -1,4 +1,4 @@
-# MemorySnitcher
+# MemorySnitcher and the power of NtReadVirtualMemory
 
 ## TL;DR
 
@@ -9,7 +9,33 @@
 - Using an application with any vulnerability which leaks memory addresses (on purpose) seems to go undetected.
 
 
+----------------------------------------------------------
+
 <br>
+
+## Index
+
+0. [Motivation](#motivation)
+
+1. [Approach 1: Print the addresses directly](#approach-1-print-the-addresses-directly)
+
+2. [Approach 2: More code!](#approach-2-more-code)
+
+3. [Approach 3: Address leak by design](#approach-3-address-leak-by-design)
+
+   - [Leak 1: Format String Vulnerability](#leak-1-format-string-vulnerability)
+
+   - [Leak 2: Stack Over-read](#leak-2-stack-over-read)
+
+   - [Leak 3: Heap override](#leak-3-heap-override)
+
+4. [Putting it into practice: NativeBypassCredGuard example](#putting-it-into-practice-nativebypasscredguard-example)
+
+5. [Conclusion](#conclusion)
+
+<br>
+
+
 
 
 ## Motivation
@@ -90,6 +116,8 @@ These 2 addresses are just numbers, so could be hardcoded or used as input argum
 <br>
 
 
+
+
 ## Approach 1: Print the addresses directly
 
 The easiest way to obtain these addreses is just to print them: 
@@ -109,7 +137,7 @@ int main(int argc, char* argv[]) {
 
 ![ra](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/read_addresses.png)
 
-But it does not look very OPSEC-like:
+It is very straightforward but it does not look very OPSEC-safe:
 
 ![rav](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/read_addresses_virustotal_1.png)
 
@@ -126,7 +154,9 @@ We could not find an stealthy way to resolve these 2 addresses, but we know it i
 <br>
 
 
-## Approach 2: Moar code!
+
+
+## Approach 2: More code!
 
 Probably the code does too much for so little lines of code, so I will rely on AI to create the most generic application (a Task Manager):
 
@@ -174,14 +204,16 @@ Using AI we can generate a new program every time we want, as huge and useless a
 <br>
 
 
+
+
 ## Approach 3: Address leak by design
 
-Once the previous technique is explained to the Blue Team, (I guess) they could create rules to detect it! So, what if instead of printing it, we create a program which leaks the addresses "by mistake"? 
-
-Can AV and EDR solutions detect this? This is a honest question, I do not know the answer xD
+Once the previous technique is explained to the Blue Team, (I guess) they could create rules to detect it! So, what if instead of printing it, we create a program which leaks the addresses "by mistake" (but on purpose)? Can AV and EDR solutions detect this?
 
 
-### 3.1. Format String Vulnerability
+
+
+### Leak 1: Format String Vulnerability
 
 This simple code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
 
@@ -250,7 +282,9 @@ The rest of the examples offered similar results. If you compile the programs an
 <br>
 
 
-### 3.2. Stack Over-read
+
+
+### Leak 2: Stack Over-read
 
 This simple code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
 
@@ -321,7 +355,9 @@ cl /Fe:taskmanager_stack_overread.exe taskmanager_stack_overread.cpp /Od /Zi /RT
 <br>
 
 
-### 3.3. Heap override
+
+
+### Leak 3: Heap override
 
 This simple code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
 
@@ -399,3 +435,126 @@ cl /Fe:taskmanager_heap_overread.exe taskmanager_heap_overread.cpp /Od /Zi /RTC1
 ![tm4](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/task_manager_4.png)
 
 <br>
+
+
+
+
+## Putting it into practice: NativeBypassCredGuard example
+
+Once we get the leaked addresses, what can we do? Well we can update tools like [NativeBypassCredGuard](https://github.com/ricardojoserf/NativeBypassCredGuard), whose original version resolves function addresses like this:
+
+```
+void initializeFunctions() {
+    HMODULE hNtdll = LoadLibraryA("ntdll.dll");
+    NtReadVirtualMemory = (NtReadVirtualMemoryFn)GetProcAddress((HMODULE)hNtdll, "NtReadVirtualMemory");
+    NtQueryInformationProcess = (NtQueryInformationProcessFn)CustomGetProcAddress(hNtdll, "NtQueryInformationProcess");
+    NtClose = (NtCloseFn)CustomGetProcAddress(hNtdll, "NtClose");
+    NtOpenProcessToken = (NtOpenProcessTokenFn)CustomGetProcAddress(hNtdll, "NtOpenProcessToken");
+    NtAdjustPrivilegesToken = (NtAdjustPrivilegesTokenFn)CustomGetProcAddress(hNtdll, "NtAdjustPrivilegesToken");
+    NtGetNextProcess = (NtGetNextProcessFn)CustomGetProcAddress(hNtdll, "NtGetNextProcess");
+    NtCreateFile = (NtCreateFileFn)CustomGetProcAddress(hNtdll, "NtCreateFile");
+    NtReadFile = (NtReadFileFn)CustomGetProcAddress(hNtdll, "NtReadFile");
+    NtWriteVirtualMemory = (NtWriteVirtualMemoryFn)CustomGetProcAddress(hNtdll, "NtWriteVirtualMemory");
+    NtTerminateProcess = (NtTerminateProcessFn)CustomGetProcAddress(hNtdll, "NtTerminateProcess");
+    NtProtectVirtualMemory = (NtProtectVirtualMemoryFn)CustomGetProcAddress(hNtdll, "NtProtectVirtualMemory");
+    NtCreateUserProcess = (NtCreateUserProcessFn)CustomGetProcAddress(hNtdll, "NtCreateUserProcess");
+    RtlCreateProcessParametersEx = (RtlCreateProcessParametersExFn)CustomGetProcAddress(hNtdll, "RtlCreateProcessParametersEx");
+    RtlDestroyProcessParameters = (RtlDestroyProcessParametersFn)CustomGetProcAddress(hNtdll, "RtlDestroyProcessParameters");
+    RtlAllocateHeap = (RtlAllocateHeapFn)CustomGetProcAddress(hNtdll, "RtlAllocateHeap");
+    RtlFreeHeap = (RtlFreeHeapFn)CustomGetProcAddress(hNtdll, "RtlFreeHeap");
+    RtlInitUnicodeString = (RtlInitUnicodeStringFn)CustomGetProcAddress(hNtdll, "RtlInitUnicodeString");
+}
+```
+
+The original program took one input argument, now it will take 2 more and will be sent to this function:
+
+```
+int main(int argc, char* argv[]) {
+    bool debug = true;
+
+    if (!is64BitProcess()) {
+        printf("[-] File must be compiled as 64-bit binary.\n");
+        return 1;
+    }
+
+    // Ahora se requieren al menos 4 argumentos: modo, arg1, arg2
+    if (argc < 4) {
+        help();
+        return 1;
+    }
+
+    if (debug) {
+        printf("[+] Debug messages:\t\t%s\n", debug ? "true" : "false");
+    }
+
+    // Primer argumento: modo (check o patch)
+    char* modeArg = argv[1];
+    for (char* p = modeArg; *p; ++p) *p = tolower(*p);
+
+    // Segundo y tercer argumento para initializeFunctions
+    void* initArg1 = (void*)argv[2];
+    void* initArg2 = (void*)argv[3];
+
+    initializeFunctions(initArg1, initArg2);
+
+    if (strcmp(modeArg, "check") == 0 || strcmp(modeArg, "patch") == 0) {
+        if (argc >= 5 && strcmp(argv[4], "true") == 0) {
+            char* process_to_create = (char*)"c:\\Windows\\System32\\calc.exe";
+            HANDLE hProcess = CreateSuspProc(process_to_create);
+            RemapNtdll(hProcess);
+        }
+        exec(modeArg, debug);
+    } else {
+        help();
+    }
+
+    return 0;
+}
+```
+
+
+```
+void initializeFunctions(uintptr_t hNtdllPtr, uintptr_t NtReadVirtualMemoryPtr) {
+    HMODULE hNtdll = (HMODULE)hNtdllPtr;
+    NtReadVirtualMemory = (NtReadVirtualMemoryFn)NtReadVirtualMemoryPtr;
+
+    NtQueryInformationProcess = (NtQueryInformationProcessFn)CustomGetProcAddress(hNtdll, "NtQueryInformationProcess");
+    NtClose = (NtCloseFn)CustomGetProcAddress(hNtdll, "NtClose");
+    NtOpenProcessToken = (NtOpenProcessTokenFn)CustomGetProcAddress(hNtdll, "NtOpenProcessToken");
+    NtAdjustPrivilegesToken = (NtAdjustPrivilegesTokenFn)CustomGetProcAddress(hNtdll, "NtAdjustPrivilegesToken");
+    NtGetNextProcess = (NtGetNextProcessFn)CustomGetProcAddress(hNtdll, "NtGetNextProcess");
+    NtCreateFile = (NtCreateFileFn)CustomGetProcAddress(hNtdll, "NtCreateFile");
+    NtReadFile = (NtReadFileFn)CustomGetProcAddress(hNtdll, "NtReadFile");
+    NtWriteVirtualMemory = (NtWriteVirtualMemoryFn)CustomGetProcAddress(hNtdll, "NtWriteVirtualMemory");
+    NtTerminateProcess = (NtTerminateProcessFn)CustomGetProcAddress(hNtdll, "NtTerminateProcess");
+    NtProtectVirtualMemory = (NtProtectVirtualMemoryFn)CustomGetProcAddress(hNtdll, "NtProtectVirtualMemory");
+    NtCreateUserProcess = (NtCreateUserProcessFn)CustomGetProcAddress(hNtdll, "NtCreateUserProcess");
+    RtlCreateProcessParametersEx = (RtlCreateProcessParametersExFn)CustomGetProcAddress(hNtdll, "RtlCreateProcessParametersEx");
+    RtlDestroyProcessParameters = (RtlDestroyProcessParametersFn)CustomGetProcAddress(hNtdll, "RtlDestroyProcessParameters");
+    RtlAllocateHeap = (RtlAllocateHeapFn)CustomGetProcAddress(hNtdll, "RtlAllocateHeap");
+    RtlFreeHeap = (RtlFreeHeapFn)CustomGetProcAddress(hNtdll, "RtlFreeHeap");
+    RtlInitUnicodeString = (RtlInitUnicodeStringFn)CustomGetProcAddress(hNtdll, "RtlInitUnicodeString");
+}
+```
+
+Let's run it to find it still works:
+
+![nbcg1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nbcg_1.png)
+
+
+And analyze it with PE-Bear to find *GetProcAddress* and *LoadLibrary* is missing:
+
+![nbcg2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nbcg_2.png)
+
+<br>
+
+
+## Conclusion
+
+In summary, dynamically resolving NTAPI functions without relying on the Import Address Table remains a tricky problem due to the chicken-and-egg issue of needing NtReadVirtualMemory and ntdll.dll addresses upfront. 
+
+Directly printing these addresses is the simplest approach but easily raises suspicion and detection risks.
+
+By embedding the address leak inside a seemingly benign, large application, either through intentional vulnerabilities like format string bugs, stack over-reads, or heap overrides, we can covertly expose these addresses. This technique seems to effectively bypass many static detection mechanisms and can be adapted with autogenerated code to evade heuristic and signature-based detections.
+
+Incorporating this strategy into tools, in this case NativeBypassCredGuard, shows how these leaked addresses could help to make API resolution stealthier because common APIs needed for it such as *GetProcAddress* and *LoadLibrary* are not present in the Import Address Table of the binary.
