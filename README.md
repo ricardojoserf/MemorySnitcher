@@ -1,12 +1,12 @@
-# MemorySnitcher and the power of NtReadVirtualMemory
+# MemorySnitcher
 
 ## TL;DR
 
-- Using dynamic API resolution to avoid functions to appear in the IAT still requires the ntdll.dll and *NtReadVirtualMemory* addresses.
+- Using dynamic API resolution to avoid functions appearing in the IAT still requires the ntdll.dll and *NtReadVirtualMemory* addresses.
 
-- A separate application which just prints these addresses looks suspicious.
+- A separate application which just prints these addresses may look suspicious.
 
-- Using an application with any vulnerability which leaks memory addresses (on purpose) seems to go undetected.
+- Using an application with any vulnerability which leaks memory addresses (on purpose) may be stealthier.
 
 
 ----------------------------------------------------------
@@ -15,13 +15,15 @@
 
 ## Index
 
-0. [Motivation](#motivation)
+1. [Motivation](#motivation)
 
-1. [Approach 1: Print the addresses directly](#approach-1-print-the-addresses-directly)
+2. [ntdll.dll and NtReadVirtualMemory](#ntdlldll-and-ntreadvirtualmemory-for-api-resolution)
 
-2. [Approach 2: More code!](#approach-2-more-code)
+3. [Approach 1: Print the addresses directly](#approach-1-print-the-addresses-directly)
 
-3. [Approach 3: Address leak by design](#approach-3-address-leak-by-design)
+4. [Approach 2: More code!](#approach-2-more-code)
+
+5. [Approach 3: Address leak by design](#approach-3-address-leak-by-design)
 
    - [Leak 1: Format String Vulnerability](#leak-1-format-string-vulnerability)
 
@@ -29,9 +31,9 @@
 
    - [Leak 3: Heap override](#leak-3-heap-override)
 
-4. [Putting it into practice: NativeBypassCredGuard example](#putting-it-into-practice-nativebypasscredguard-example)
+6. [Putting it into practice: NativeBypassCredGuard example](#putting-it-into-practice-nativebypasscredguard-example)
 
-5. [Conclusion](#conclusion)
+7. [Conclusion](#conclusion)
 
 <br>
 
@@ -40,17 +42,17 @@
 
 ## Motivation
 
-Last months, I have made public some tools which use "only" lower-level functions in the ntdll.dll library, also known as NTAPIs. This DLL contains the lowest level functions in user-mode because it interacts directly with *ntoskrnl.exe*, which is already kernel-mode.
+Over the last few months, I have made public some tools that use "only" low-level functions in the ntdll.dll library, also known as NTAPIs. This DLL contains the lowest level functions in user-mode because it interacts directly with *ntoskrnl.exe*, which is already kernel-mode.
 
 Some of these projects have been [NativeDump](https://github.com/ricardojoserf/NativeDump) and [TrickDump](https://github.com/ricardojoserf/TrickDump) to dump the LSASS process; [NativeBypassCredGuard](https://github.com/ricardojoserf/NativeBypassCredGuard) to patch Credential Guard; [NativeTokenImpersonate](https://github.com/ricardojoserf/NativeTokenImpersonate) to impersonate tokens and [NativeNtdllRemap](https://github.com/ricardojoserf/NativeNtdllRemap) to remap ntdll.dll.
 
-It bothered me to have all the necessary functions in the Import Address Table (IAT) of the binary, because this could hint towards the true intentions of the compiled binary, so I implemented dynamic API resolution. However, using it, I could not avoid calling *GetModuleHandle* and *GetProcAddress* - and these are not ntdll.dll functions!
+It bothered me to have all the necessary functions in the Import Address Table (IAT) of the binary, because this could hint at the true intentions of the compiled binary, so I implemented dynamic API resolution. However, using it, I could not avoid calling *GetModuleHandle* and *GetProcAddress* - which are not part of ntdll.dll!
 
 <br>
 
 ## ntdll.dll and NtReadVirtualMemory for API resolution
 
-To use dynamic API resolution, I created functions mimicking *GetModuleHandle* and *GetProcAddress*. *GetModuleHandle* returns the address of a loaded DLL given the library name (*LoadLibrary* works too but I would only use it if the DLL is not already loaded in the process) and *GetProcAddress* returns the address of a function given the DLL address and the function name. 
+To use dynamic API resolution, I created functions mimicking *GetModuleHandle* and *GetProcAddress*. *GetModuleHandle* returns the address of a loaded DLL given the library name (*LoadLibrary* works too, but I would only use it if the DLL is not already loaded in the process) and *GetProcAddress* returns the address of a function given the DLL address and the function name. 
 
 By walking the PEB, it is possible to do this using only functions in ntdll.dll:
 
@@ -58,7 +60,7 @@ By walking the PEB, it is possible to do this using only functions in ntdll.dll:
 
 - Custom implementation of *GetModuleHandle* requires *NtReadVirtualMemory*, *NtQueryInformationProcess* and *RtlUnicodeStringToAnsiString*.
 
-The problem: you need some way to resolve at least ntdll.dll and *NtReadVirtualMemory*. With those 2 addresses, you can use your custom *GetProcAddress* to get the function address of any function in ntdll.dll. 
+The problem: you need some way to resolve at least ntdll.dll and *NtReadVirtualMemory*. With those two addresses, you can use your custom implementation of *GetProcAddress* to get the function address of any function in ntdll.dll. 
 
 And, resolving *NtQueryInformationProcess* and *RtlUnicodeStringToAnsiString*, you can use your custom *GetModuleHandle* to get the base address of any DLL, in case you are not sticking to using only NTAPIs.
 
@@ -89,17 +91,17 @@ int main() {
 }
 ```
 
-- First, NtReadVirtualMemory address is calculated using *GetModuleHandleA* and *GetProcAddress*. The ntdll.dll library is the first one to get loaded in any process, so you would not need *LoadLibrary*.
+- First, NtReadVirtualMemory address is calculated using *GetModuleHandleA* and *GetProcAddress*. The ntdll.dll library is the first one to get loaded in any process, so there is no need for *LoadLibrary*.
 
 - *NtQueryInformationProcess* and *RtlUnicodeStringToAnsiString* get resolved with the custom implementation of *GetProcAddress*, using ntdll.dll base address.
 
 - Then, any function address in any DLL can be calculated dynamically using the custom implementation of *GetModuleHandle*.
 
-From this code, we find we only call *GetModuleHandleA* once to get ntdll.dll address; and *GetProcAddress* once to get *NtReadVirtualMemory* address. The rest of addresses can be calculated dynamically!
+From this code, we find we only call *GetModuleHandleA* once to get ntdll.dll address; and *GetProcAddress* once to get *NtReadVirtualMemory* address. The rest of the addresses can be calculated dynamically!
 
 The problem is, even if we only call them once, we would have *GetModuleHandleA* and *GetProcAddress* functions in the Import Address Table of the binary, which can be considered suspicious. 
 
-Let's check it with PE-BEAR:
+Let's verify it using PE-BEAR:
 
 ![it1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nativentdllremap_import_table.png)
 
@@ -120,7 +122,7 @@ These 2 addresses are just numbers, so could be hardcoded or used as input argum
 
 ## Approach 1: Print the addresses directly
 
-The easiest way to obtain these addreses is just to print them: 
+The easiest way to obtain these addresses is just to print them: 
 
 ```c
 #include <iostream>
@@ -137,7 +139,7 @@ int main(int argc, char* argv[]) {
 
 ![ra](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/read_addresses.png)
 
-It is very straightforward but it does not look very OPSEC-safe:
+It is straightforward, but not very OPSEC-safe:
 
 ![rav](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/read_addresses_virustotal_1.png)
 
@@ -149,7 +151,7 @@ The file *resolve.c* contains the code to resolve the function in any DLL given 
 
 ![r1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/resolve_1.png)
 
-We could not find an stealthy way to resolve these 2 addresses, but we know it is enough to send these 2 addresses as parameters to a program, and with that the program can resolve any function. Without any extra function in the IAT! 
+We could not find a stealthy way to resolve these 2 addresses, but we know it is enough to send these 2 addresses as parameters to a program, and with that the program can resolve any function. And without adding any extra functions to the IAT! 
 
 <br>
 
@@ -158,7 +160,7 @@ We could not find an stealthy way to resolve these 2 addresses, but we know it i
 
 ## Approach 2: More code!
 
-Probably the code does too much for so little lines of code, so I will rely on AI to create the most generic application (a Task Manager):
+The code probably does too much for so few lines of code, so I will rely on AI to create the most generic application (a Task Manager):
 
 ```
 Give me the code for a C++ application of at least 300 lines that under no circumstances could be considered malicious by an antivirus or EDR. For example, a Task management program
@@ -199,7 +201,7 @@ VirusTotal shows there are many less detections:
 ![tmv](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/task_manager_1_virustotal.png)
 
 
-Using AI we can generate a new program every time we want, as huge and useless as needed! So we could bypass static analysis with a technique like this.
+Using AI we can generate a new program every time we want, as huge and useless as needed, allowing us to bypass static analysis with this technique.
 
 <br>
 
@@ -208,7 +210,7 @@ Using AI we can generate a new program every time we want, as huge and useless a
 
 ## Approach 3: Address leak by design
 
-Once the previous technique is explained to the Blue Team, (I guess) they could create rules to detect it! So, what if instead of printing it, we create a program which leaks the addresses "by mistake" (but on purpose)? Can AV and EDR solutions detect this?
+Once the previous technique is explained to the Blue Team, (I guess) they could create rules to detect it! So, what if instead of printing it, we create a program which leaks the addresses "by mistake" (but not really)? Will AV and EDR solutions detect this?
 
 
 
@@ -231,7 +233,7 @@ int main() {
 }
 ```
 
-Compile it like this:
+Compile it using the following command:
 
 ```
 cl /Fe:leak_format_string.exe leak_format_string.c /Od /Zi /RTC1
@@ -265,7 +267,7 @@ Compile it again and get the addresses:
 
 ![fs2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_2.png)
 
-Let's add it to the Task Management code, which calls this function using the secret code 33. Compile *taskmanager_format_string.c* and run it:
+Let's add it to the Task Management code, which invokes this function when the secret code 33 is selected. Compile *taskmanager_format_string.c* and run it:
 
 ```
 cl /Fe:taskmanager_format_string.exe taskmanager_format_string.cpp /Od /Zi /RTC1
@@ -306,7 +308,7 @@ int main() {
 }
 ```
 
-Compile it like this:
+Compile it using the following command:
 
 ```
 cl /Fe:leak_stack_overread.exe leak_stack_overread.c /Od /Zi /RTC1
@@ -344,7 +346,7 @@ Compile it again and get the addresses:
 
 ![or2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_2.png)
 
-Let's add it to the Task Management code, which calls this function using the secret code 33. Compile *taskmanager_stack_overread.c* and run it:
+Let's add it to the Task Management code, which invokes this function when the secret code 33 is selected. Compile *taskmanager_stack_overread.c* and run it:
 
 ```
 cl /Fe:taskmanager_stack_overread.exe taskmanager_stack_overread.cpp /Od /Zi /RTC1
@@ -384,7 +386,7 @@ int main() {
 }
 ```
 
-Compile it like this:
+Compile it using the following command:
 
 ```
 cl /Fe:leak_heap_overread.exe leak_heap_overread.c /Od /Zi /RTC1
@@ -426,7 +428,7 @@ Compile it again and get the addresses:
 ![hor2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/heap_overread_2.png)
 
 
-Let's add it to the Task Management code, which calls this function using the secret code 33. Compile *taskmanager_heao_overread.c* and run it:
+Let's add it to the Task Management code, which invokes this function when the secret code 33 is selected. Compile *taskmanager_heao_overread.c* and run it:
 
 ```
 cl /Fe:taskmanager_heap_overread.exe taskmanager_heap_overread.cpp /Od /Zi /RTC1
@@ -466,52 +468,18 @@ void initializeFunctions() {
 }
 ```
 
-The original program took one input argument, now it will take 2 more and will be sent to this function:
+The program will take 2 more input arguments which will be sent to the function:
 
 ```
 int main(int argc, char* argv[]) {
-    bool debug = true;
-
-    if (!is64BitProcess()) {
-        printf("[-] File must be compiled as 64-bit binary.\n");
-        return 1;
-    }
-
-    // Ahora se requieren al menos 4 argumentos: modo, arg1, arg2
-    if (argc < 4) {
-        help();
-        return 1;
-    }
-
-    if (debug) {
-        printf("[+] Debug messages:\t\t%s\n", debug ? "true" : "false");
-    }
-
-    // Primer argumento: modo (check o patch)
-    char* modeArg = argv[1];
-    for (char* p = modeArg; *p; ++p) *p = tolower(*p);
-
-    // Segundo y tercer argumento para initializeFunctions
-    void* initArg1 = (void*)argv[2];
-    void* initArg2 = (void*)argv[3];
-
-    initializeFunctions(initArg1, initArg2);
-
-    if (strcmp(modeArg, "check") == 0 || strcmp(modeArg, "patch") == 0) {
-        if (argc >= 5 && strcmp(argv[4], "true") == 0) {
-            char* process_to_create = (char*)"c:\\Windows\\System32\\calc.exe";
-            HANDLE hProcess = CreateSuspProc(process_to_create);
-            RemapNtdll(hProcess);
-        }
-        exec(modeArg, debug);
-    } else {
-        help();
-    }
-
-    return 0;
+   uintptr_t initArg1 = (uintptr_t)strtoull(argv[1], NULL, 16);
+   uintptr_t initArg2 = (uintptr_t)strtoull(argv[2], NULL, 16);
+   initializeFunctions(initArg1, initArg2
+   ...
 }
 ```
 
+And the function will now look like this:
 
 ```
 void initializeFunctions(uintptr_t hNtdllPtr, uintptr_t NtReadVirtualMemoryPtr) {
@@ -537,7 +505,7 @@ void initializeFunctions(uintptr_t hNtdllPtr, uintptr_t NtReadVirtualMemoryPtr) 
 }
 ```
 
-Let's run it to find it still works:
+Next, we attempt to run it to find it still works:
 
 ![nbcg1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nbcg_1.png)
 
