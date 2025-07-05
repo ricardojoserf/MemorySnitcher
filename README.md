@@ -510,7 +510,7 @@ void initializeFunctions(uintptr_t hNtdllPtr, uintptr_t NtReadVirtualMemoryPtr) 
 
 First, the addresses are leaked using the heap overread code:
 
-![nbcg1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nbcg_1.png)
+![nbcg0](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nbcg_0.png)
 
 
 Next, we attempt to run it using the addresses to find it still works:
