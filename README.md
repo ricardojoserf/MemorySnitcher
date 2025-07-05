@@ -183,7 +183,6 @@ The called function will print the addresses:
 void test() {
     HMODULE hNtdll = LoadLibraryA("ntdll.dll");
     FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
-    printf("0x%p\t0x%p\n", hNtdll, hNtdll);
     printf("0x%p\t0x%p\n", hNtdll, pNtReadVirtualMemory);
     return;
 }
@@ -215,7 +214,7 @@ Using AI we can generate a new program every time we want, as huge and useless a
 Once the previous technique is explained to the Blue Team, (I guess) they could create rules to detect it! So, what if instead of printing it, we create a program which leaks the addresses "by mistake" (but not really)? Will AV and EDR solutions detect this?
 
 
-
+<br>
 
 ### Leak 1: Format String Vulnerability
 
@@ -238,7 +237,7 @@ int main() {
 Compile it using the following command and execute it:
 
 ```
-cl /Fe:leak_format_string.exe leak_format_string.c /Od /Zi /RTC1
+cl /Fe:format_string.exe leak_format_string.c /Od /Zi /RTC1
 ```
 
 ![fs1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_1.png)
@@ -263,10 +262,10 @@ int main() {
 }
 ```
 
-The previous simple code snippet is available [here](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_format_string.c), compile it again and get the addresses:
+The previous simple code snippet is available [in the snippets folder](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_format_string.c), compile it again and get the addresses:
 
 ```
-cl leak_format_string.c /Feformat_string_addresses.exe
+cl /Fe:format_string_addresses.exe leak_format_string.c /Od /Zi /RTC1
 ```
 
 ![fs2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_2.png)
@@ -315,7 +314,7 @@ int main() {
 Compile it using the following command and execute it:
 
 ```
-cl /Fe:leak_stack_overread.exe leak_stack_overread.c /Od /Zi /RTC1
+cl /Fe:overread.exe leak_stack_overread.c /Od /Zi /RTC1
 ```
 
 ![or1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_1.png)
@@ -344,10 +343,10 @@ int main() {
 }
 ```
 
-The previous simple code snippet is available [here](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_stack_overread.c), compile it again and get the addresses:
+The previous simple code snippet is available [in the snippets folder](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_stack_overread.c), compile it again and get the addresses:
 
 ```
-cl leak_stack_overread.c /Feoverread_addresses.exe
+cl /Fe:overread_addresses.exe leak_stack_overread.c /Od /Zi /RTC1
 ```
 
 ![or2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_2.png)
@@ -395,7 +394,7 @@ int main() {
 Compile it using the following command and execute it:
 
 ```
-cl /Fe:leak_heap_overread.exe leak_heap_overread.c /Od /Zi /RTC1
+cl /Fe:heap_overread.exe leak_heap_overread.c /Od /Zi /RTC1
 ```
 
 ![hor1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/heap_overread_1.png)
@@ -427,10 +426,10 @@ int main() {
 }
 ```
 
-The previous simple code snippet is available [here](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_heap_overread.c), compile it again and get the addresses:
+The previous simple code snippet is available [in the snippets folder](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_heap_overread.c), compile it again and get the addresses:
 
 ```
-cl leak_heap_overread.c /Feheap_overread_addresses.exe
+cl /Fe:heap_overread_addresses.exe leak_heap_overread.c /Od /Zi /RTC1
 ```
 
 ![hor2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/heap_overread_2.png)
@@ -524,11 +523,12 @@ Next, we attempt to run it using the addresses to find it still works:
 ![nbcg1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nbcg_1.png)
 
 
-Finally, analyze it with PE-Bear to find *GetProcAddress* and *LoadLibrary* are missing:
+Finally, analyze it with PE-Bear to find *GetProcAddress*, *GetModuleHandle* and *LoadLibrary* are missing... Success!!!
 
 ![nbcg2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nbcg_2.png)
 
 <br>
+
 
 
 ## Conclusion
