@@ -234,7 +234,7 @@ int main() {
 }
 ```
 
-Compile it using the following command and execute it:
+Compile it using "x64 Native Tools Command Prompt for VS" and execute it:
 
 ```
 cl /Fe:format_string.exe leak_format_string.c /Od /Zi /RTC1
