@@ -46,7 +46,7 @@ Over the last few months, I have made public some tools that use "only" low-leve
 
 Some of these projects have been [NativeDump](https://github.com/ricardojoserf/NativeDump) and [TrickDump](https://github.com/ricardojoserf/TrickDump) to dump the LSASS process; [NativeBypassCredGuard](https://github.com/ricardojoserf/NativeBypassCredGuard) to patch Credential Guard; [NativeTokenImpersonate](https://github.com/ricardojoserf/NativeTokenImpersonate) to impersonate tokens and [NativeNtdllRemap](https://github.com/ricardojoserf/NativeNtdllRemap) to remap ntdll.dll.
 
-It bothered me to have all the necessary functions in the Import Address Table (IAT) of the binary, because this could hint at the true intentions of the compiled binary, so I implemented dynamic API resolution. However, using it, I could not avoid calling *GetModuleHandle* and *GetProcAddress* - which are not part of ntdll.dll!
+It bothered me to have all the necessary functions in the Import Address Table (IAT) of the binary, because this could hint at the true intentions of the compiled binary, so I implemented dynamic API resolution. However, using it, I could not avoid calling *GetModuleHandle* or *LoadLibrary* and *GetProcAddress* - which are part of kernel32.dll, not ntdll.dll!
 
 <br>
 
