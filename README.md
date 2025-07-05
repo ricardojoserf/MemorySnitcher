@@ -189,6 +189,8 @@ void test() {
 }
 ```
 
+Compile [taskmanager_print_addresses.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/taskmanager_print_addresses.cpp) and run it:
+
 ```
 cl /Fe:taskmanager_print_addresses.exe taskmanager_print_addresses.cpp /Od /Zi /RTC1
 ```
@@ -217,7 +219,7 @@ Once the previous technique is explained to the Blue Team, (I guess) they could 
 
 ### Leak 1: Format String Vulnerability
 
-This simple code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
+This code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
 
 ```c
 #include <stdio.h>
@@ -263,11 +265,11 @@ int main() {
 }
 ```
 
-Compile it again and get the addresses:
+The previous simple code snippet is available [here](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_format_string.c), compile it again and get the addresses:
 
 ![fs2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_2.png)
 
-Let's add it to the Task Management code, which invokes this function when the secret code 33 is selected. Compile *taskmanager_format_string.c* and run it:
+Let's add it to the Task Management code, which invokes this function when the secret code 33 is selected. Compile [taskmanager_format_string.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/taskmanager_format_string.cpp) and run it:
 
 ```
 cl /Fe:taskmanager_format_string.exe taskmanager_format_string.cpp /Od /Zi /RTC1
@@ -288,7 +290,7 @@ The rest of the examples offered similar results. If you compile the programs an
 
 ### Leak 2: Stack Over-read
 
-This simple code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
+This code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
 
 ```c
 #include <stdio.h>
@@ -342,11 +344,11 @@ int main() {
 }
 ```
 
-Compile it again and get the addresses:
+The previous simple code snippet is available [here](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_stack_overread.c), compile it again and get the addresses:
 
 ![or2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_2.png)
 
-Let's add it to the Task Management code, which invokes this function when the secret code 33 is selected. Compile *taskmanager_stack_overread.c* and run it:
+Let's add it to the Task Management code, which invokes this function when the secret code 33 is selected. Compile [taskmanager_stack_overread.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/taskmanager_stack_overread.cpp) and run it:
 
 ```
 cl /Fe:taskmanager_stack_overread.exe taskmanager_stack_overread.cpp /Od /Zi /RTC1
@@ -361,7 +363,7 @@ cl /Fe:taskmanager_stack_overread.exe taskmanager_stack_overread.cpp /Od /Zi /RT
 
 ### Leak 3: Heap override
 
-This simple code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
+This code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
 
 ```c
 #include <stdio.h>
@@ -423,12 +425,12 @@ int main() {
 }
 ```
 
-Compile it again and get the addresses:
+The previous simple code snippet is available [here](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_heap_overread.c), compile it again and get the addresses:
 
 ![hor2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/heap_overread_2.png)
 
 
-Let's add it to the Task Management code, which invokes this function when the secret code 33 is selected. Compile *taskmanager_heao_overread.c* and run it:
+Let's add it to the Task Management code, which invokes this function when the secret code 33 is selected. Compile [taskmanager_heap_overread.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/taskmanager_heap_overread.cpp) and run it:
 
 ```
 cl /Fe:taskmanager_heap_overread.exe taskmanager_heap_overread.cpp /Od /Zi /RTC1
