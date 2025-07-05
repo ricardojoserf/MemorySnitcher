@@ -257,22 +257,22 @@ cl /Fe:format_string.exe leak_format_string.c /Od /Zi /RTC1
 
 ![fs1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_1.png)
 
-The values are leaked! Now it is time to leak the address:
+The values are leaked! Now it is time to leak the function address:
 
 ```c
 #include <windows.h>
 #include <stdio.h>
 
 int main() {
-    HMODULE hNtdll = LoadLibraryA("ntdll.dll");
-    FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
-    
-    long long leakme1 = (long long) pNtReadVirtualMemory;
-    char input[100];
-    sprintf(input, "%p %p %p\n");
-    printf(input);
-
-    return 0;
+   HMODULE hNtdll = LoadLibraryA("ntdll.dll");
+   FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
+   
+   long long leakme1 = (long long) pNtReadVirtualMemory;
+   char input[100];
+   sprintf(input, "%p %p %p %p\n");
+   printf(input);
+   
+   return 0;
 }
 ```
 
@@ -333,28 +333,23 @@ cl /Fe:overread.exe leak_stack_overread.c /Od /Zi /RTC1
 
 ![or1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_1.png)
 
-The values are leaked! Now it is time to leak the addresses:
+The values are leaked! Now it is time to leak the function address:
 
 ```c
 #include <windows.h>
 #include <stdio.h>
 
 int main() {
-    HMODULE hNtdll = LoadLibraryA("ntdll.dll");
-    FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
-    
-    char buffer[8] = "leak";
-    // long long leakme1 = (long long) hNtdll;
-    // long long leakme2 = (long long) pNtReadVirtualMemory;
-    long long leakme1 = pNtReadVirtualMemory;
-    unsigned char *ptr = (unsigned char *)buffer;
-
-    for (int i = 23; i >= 16; i--) { printf("%02X", ptr[i]); }
-    // printf(" ");
-    // for (int i = 31; i >= 24; i--) { printf("%02X", ptr[i]); }
-    printf("\n");
-    
-    return 0;
+   HMODULE hNtdll = LoadLibraryA("ntdll.dll");
+   FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
+   
+   char buffer[8] = "leak";
+   long long leakme1 = (long long) pNtReadVirtualMemory;
+   unsigned char *ptr = (unsigned char *)buffer;
+   
+   for (int i = 23; i >= 16; i--) { printf("%02X", ptr[i]); }
+   
+   return 0;
 }
 ```
 
@@ -414,32 +409,24 @@ cl /Fe:heap_overread.exe leak_heap_overread.c /Od /Zi /RTC1
 
 ![hor1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/heap_overread_1.png)
 
-
-The values are leaked! Now it is time to leak the addresses:
+The values are leaked! Now it is time to leak the function address:
 
 ```c
 #include <windows.h>
 #include <stdio.h>
 
 int main() {
-    HMODULE hNtdll = LoadLibraryA("ntdll.dll");
-    FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
-
-    char *buffer = (char *)malloc(32);
-    strcpy(buffer, "leak");
-    // long long *leakme1 = (long long *)(buffer + 16);
-    // long long *leakme2 = (long long *)(buffer + 24);
-    // *leakme1 = hNtdll;
-    // *leakme2 = pNtReadVirtualMemory;
-    long long *leakme1 = (long long *)(buffer + 16);
-    *leakme1 = pNtReadVirtualMemory;
-
-    for (int i = 23; i >= 16; i--) { printf("%02X", (unsigned char)buffer[i]); }
-    // printf(" ");
-    // for (int i = 31; i >= 24; i--) { printf("%02X", (unsigned char)buffer[i]); }
-    printf("\n");
-
-    return 0;
+   HMODULE hNtdll = LoadLibraryA("ntdll.dll");
+   FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
+   
+   char *buffer = (char *)malloc(32);
+   strcpy(buffer, "leak");
+   uintptr_t *leakme1 = (uintptr_t *)(buffer + 16);
+   *leakme1 = (uintptr_t)pNtReadVirtualMemory;
+   
+   for (int i = 23; i >= 16; i--) { printf("%02X", (unsigned char)buffer[i]); }
+   
+   return 0;
 }
 ```
 
