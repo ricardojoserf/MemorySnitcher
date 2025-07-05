@@ -3,7 +3,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-
 typedef enum   _PROCESSINFOCLASS { ProcessBasicInformation = 0 } PROCESSINFOCLASS;
 typedef struct _UNICODE_STRING { USHORT Length, MaximumLength; PWSTR Buffer; } UNICODE_STRING, * PUNICODE_STRING;
 typedef struct _STRING { USHORT Length; USHORT MaximumLength; PCHAR Buffer; } ANSI_STRING, * PANSI_STRING;

