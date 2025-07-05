@@ -470,7 +470,7 @@ void initializeFunctions() {
 }
 ```
 
-The program will take 2 more input arguments which will be sent to the function:
+The updated version [NativeBypassCredGuard_Updated.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/NativeBypassCredGuard_Updated.cpp) will take 2 more input arguments which will take the two needed addresses:
 
 ```
 int main(int argc, char* argv[]) {
@@ -481,12 +481,12 @@ int main(int argc, char* argv[]) {
 }
 ```
 
-And the function will now look like this:
+And the function initializeFunctions will now take these two values:
 
 ```
 void initializeFunctions(uintptr_t hNtdllPtr, uintptr_t NtReadVirtualMemoryPtr) {
-    HMODULE hNtdll = (HMODULE)hNtdllPtr;
-    NtReadVirtualMemory = (NtReadVirtualMemoryFn)NtReadVirtualMemoryPtr;
+    HMODULE hNtdll = (HMODULE)hNtdllPtr; // Instead of LoadLibrary
+    NtReadVirtualMemory = (NtReadVirtualMemoryFn)NtReadVirtualMemoryPtr; // Instead of GetProcAddress 
 
     NtQueryInformationProcess = (NtQueryInformationProcessFn)CustomGetProcAddress(hNtdll, "NtQueryInformationProcess");
     NtClose = (NtCloseFn)CustomGetProcAddress(hNtdll, "NtClose");
