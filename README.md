@@ -19,13 +19,11 @@
 
 2. [ntdll.dll and NtReadVirtualMemory](#ntdlldll-and-ntreadvirtualmemory-for-api-resolution)
 
-3. [Approach 1: Print the addresses directly](#approach-1-print-the-addresses-directly)
+3. [Approach 1: Print the address](#approach-1-print-the-address)
 
-4. [Approach 2: NtReadVirtualMemory is more than enough](#approach-2-ntreadvirtualmemory-is-more-than-enough)
+4. [Approach 2: More code!](#approach-2-more-code)
 
-5. [Approach 3: More code!](#approach-3-more-code)
-
-6. [Approach 4: Address leak by design](#approach-4-address-leak-by-design)
+5. [Approach 3: Address leak by design](#approach-3-address-leak-by-design)
 
    - [Leak 1: Format String Vulnerability](#leak-1-format-string-vulnerability)
 
@@ -33,9 +31,9 @@
 
    - [Leak 3: Heap override](#leak-3-heap-override)
 
-7. [Putting it into practice: NativeBypassCredGuard example](#putting-it-into-practice-nativebypasscredguard-example)
+6. [Putting it into practice: NativeBypassCredGuard example](#putting-it-into-practice-nativebypasscredguard-example)
 
-8. [Conclusion](#conclusion)
+7. [Conclusion](#conclusion)
 
 <br>
 
@@ -115,43 +113,7 @@ Regarding the other 15 functions, these appear because the binary was compiled w
 
 There are many blogs about compiling without CRT so I will not do it here (also, maybe not having any function in the IAT looks even worse).
 
-These 2 addresses are just numbers, so could be hardcoded or used as input arguments to the program. But... how can we get these values?
-
 <br>
-
-
-
-
-## Approach 1: Print the addresses directly
-
-The easiest way to obtain these addresses is just to print them: 
-
-```c
-#include <iostream>
-#include <windows.h>
-
-int main(int argc, char* argv[]) {
-    HMODULE hNtdll = LoadLibraryA("ntdll.dll");
-    FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
-    printf("[+] ntdll.dll address: \t\t\t0x%p\n", hNtdll);
-    printf("[+] NtReadVirtualMemory address: \t0x%p\n", pNtReadVirtualMemory);
-    return 0;
-}
-```
-
-![ra](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/read_addresses.png)
-
-It is straightforward, but not very OPSEC-safe:
-
-![rav](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/read_addresses_virustotal_1.png)
-
-
-Their values will change for every system reboot, so hardcoding them is not useful, but we can use the output from a program like *read_addresses.exe* as input parameters for our program.
-
-
-
-
-## Approach 2: NtReadVirtualMemory is more than enough
 
 After some tests, I found that the ntdll.dll base address can be bruteforced given the *NtReadVirtualMemory* address. For example, if the function address is 0x7FFE5424D7B0, the module's base address can be any value from 0x7FFE54100000 to 0x7FFE542D0000. So I created a small script to test all addresses like 0x7FFE54100000, 0x7FFE54120000,... , 0x7FFE541F0000, 0x7FFE54200000, 0x7FFE54210000,... , 0x7FFE542F0000.   
 
@@ -165,14 +127,39 @@ The file *resolve.c* contains the code to resolve the function in any DLL given 
 
 ![r1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/resolve_1.png)
 
-We could not find a stealthy way to resolve these 2 addresses, but we know it is enough to use only 1. Also, that we can use this function address as input parameter to a program, which is enough for the program to resolve any function. And without adding any extra functions to the IAT! 
+
+<br>
+
+
+## Approach 1: Print the address
+
+The easiest way to obtain the addresses is just to print it: 
+
+```c
+#include <iostream>
+#include <windows.h>
+
+int main(int argc, char* argv[]) {
+    HMODULE hNtdll = LoadLibraryA("ntdll.dll");
+    FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
+    printf("[+] NtReadVirtualMemory address: \t0x%p\n", pNtReadVirtualMemory);
+    return 0;
+}
+```
+
+![ra](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/read_addresses.png)
+
+It is straightforward, but not very OPSEC-safe:
+
+![rav](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/read_addresses_virustotal_1.png)
+
+The function address value will change for every system and reboot, so hardcoding it is not useful, but we can use the output from a program like *read_addresses.exe* as input parameters for a program such as *resolve.exe*.
 
 <br>
 
 
 
-
-## Approach 3: More code!
+## Approach 2: More code!
 
 The code probably does too much for so few lines of code, so I will rely on AI to create the most generic application (a Task Management program):
 
@@ -224,7 +211,7 @@ Using AI we can generate a new program every time we want, as huge and useless a
 
 
 
-## Approach 4: Address leak by design
+## Approach 3: Address leak by design
 
 Once the previous technique is explained to the Blue Team, (I guess) they could create rules to detect it! So, what if instead of printing it, we create a program which leaks the addresses "by mistake" (but not really)? Will AV and EDR solutions detect this?
 
