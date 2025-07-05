@@ -4,9 +4,9 @@
 
 - Using dynamic API resolution to avoid functions appearing in the IAT requires only the *NtReadVirtualMemory* address.
 
-- A separate application which just prints the address may look suspicious.
+- A separate application which just prints the address is easily detected.
 
-- Using an application with any vulnerability which leaks memory addresses (on purpose) may be stealthier.
+- Using an application with a vulnerability which leaks memory addresses (on purpose) may be stealthier.
 
 
 ----------------------------------------------------------
@@ -17,7 +17,7 @@
 
 1. [Motivation](#motivation)
 
-2. [ntdll.dll and NtReadVirtualMemory](#ntdlldll-and-ntreadvirtualmemory-for-api-resolution)
+2. [NtReadVirtualMemory for API resolution](#ntreadvirtualmemory-for-api-resolution)
 
 3. [Approach 1: Print the address](#approach-1-print-the-address)
 
@@ -50,7 +50,7 @@ It bothered me to have all the necessary functions in the Import Address Table (
 
 <br>
 
-## ntdll.dll and NtReadVirtualMemory for API resolution
+## NtReadVirtualMemory for API resolution
 
 To use dynamic API resolution, I created functions mimicking *GetModuleHandle* and *GetProcAddress*. *GetModuleHandle* returns the address of a loaded DLL given the library name (*LoadLibrary* works too, but I would only use it if the DLL is not already loaded in the process) and *GetProcAddress* returns the address of a function given the DLL address and the function name. 
 
@@ -245,7 +245,7 @@ cl /Fe:format_string.exe leak_format_string.c /Od /Zi /RTC1
 
 ![fs1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_1.png)
 
-The values are leaked! Now it is time to leak the function address:
+The values are leaked! Now it is time to leak the function address, you can find the following snippet [here](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_format_string.c):
 
 ```c
 #include <windows.h>
@@ -264,7 +264,7 @@ int main() {
 }
 ```
 
-The previous simple code snippet is available [in the snippets folder](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_format_string.c), compile it again and get the addresses:
+Compile it and get the address:
 
 ```
 cl /Fe:format_string_addresses.exe leak_format_string.c /Od /Zi /RTC1
@@ -272,7 +272,7 @@ cl /Fe:format_string_addresses.exe leak_format_string.c /Od /Zi /RTC1
 
 ![fs2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_2.png)
 
-Let's add it to the Task Management code, which invokes this function when the secret code 33 is selected. Compile [taskmanager_format_string.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/taskmanager_format_string.cpp) and run it:
+Let's add it to the Task Manager dummy code, which invokes this function when the secret code 33 is selected. Compile [taskmanager_format_string.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/taskmanager_format_string.cpp) and run it:
 
 ```
 cl /Fe:taskmanager_format_string.exe taskmanager_format_string.cpp /Od /Zi /RTC1
@@ -321,7 +321,7 @@ cl /Fe:overread.exe leak_stack_overread.c /Od /Zi /RTC1
 
 ![or1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_1.png)
 
-The values are leaked! Now it is time to leak the function address:
+The values are leaked! Now it is time to leak the function address, you can find the following snippet [here](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_stack_overread.c):
 
 ```c
 #include <windows.h>
@@ -341,7 +341,8 @@ int main() {
 }
 ```
 
-The previous simple code snippet is available [in the snippets folder](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_stack_overread.c), compile it again and get the addresses:
+
+Compile it and get the address:
 
 ```
 cl /Fe:overread_addresses.exe leak_stack_overread.c /Od /Zi /RTC1
@@ -349,7 +350,7 @@ cl /Fe:overread_addresses.exe leak_stack_overread.c /Od /Zi /RTC1
 
 ![or2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_2.png)
 
-Let's add it to the Task Management code, which invokes this function when the secret code 33 is selected. Compile [taskmanager_stack_overread.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/taskmanager_stack_overread.cpp) and run it:
+Let's add it to the Task Manager dummy code, which invokes this function when the secret code 33 is selected. Compile [taskmanager_stack_overread.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/taskmanager_stack_overread.cpp) and run it:
 
 ```
 cl /Fe:taskmanager_stack_overread.exe taskmanager_stack_overread.cpp /Od /Zi /RTC1
@@ -397,7 +398,7 @@ cl /Fe:heap_overread.exe leak_heap_overread.c /Od /Zi /RTC1
 
 ![hor1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/heap_overread_1.png)
 
-The values are leaked! Now it is time to leak the function address:
+The values are leaked! Now it is time to leak the function address, you can find the following snippet [here](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_heap_overread.c):
 
 ```c
 #include <windows.h>
@@ -418,7 +419,7 @@ int main() {
 }
 ```
 
-The previous simple code snippet is available [in the snippets folder](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_heap_overread.c), compile it again and get the addresses:
+Compile it and get the address:
 
 ```
 cl /Fe:heap_overread_addresses.exe leak_heap_overread.c /Od /Zi /RTC1
@@ -427,7 +428,7 @@ cl /Fe:heap_overread_addresses.exe leak_heap_overread.c /Od /Zi /RTC1
 ![hor2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/heap_overread_2.png)
 
 
-Let's add it to the Task Management code, which invokes this function when the secret code 33 is selected. Compile [taskmanager_heap_overread.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/taskmanager_heap_overread.cpp) and run it:
+Let's add it to the Task Manager dummy code, which invokes this function when the secret code 33 is selected. Compile [taskmanager_heap_overread.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/taskmanager_heap_overread.cpp) and run it:
 
 ```
 cl /Fe:taskmanager_heap_overread.exe taskmanager_heap_overread.cpp /Od /Zi /RTC1
@@ -467,7 +468,7 @@ void initializeFunctions() {
 }
 ```
 
-The updated version, [NativeBypassCredGuard_Updated.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/NativeBypassCredGuard_Updated.cpp), requires two additional input arguments corresponding to the necessary addresses:
+The updated version, [NativeBypassCredGuard_Updated.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/NativeBypassCredGuard_Updated.cpp), requires one additional input arguments corresponding to the *NtReadVirtualMemory* address:
 
 ```
 int main(int argc, char* argv[]) {
@@ -479,7 +480,7 @@ int main(int argc, char* argv[]) {
 }
 ```
 
-And the function initializeFunctions will now take these two values:
+And the function initializeFunctions will now take the value of the ntdll.dll base address and the *NtReadVirtualMemory* address as input arguments:
 
 ```
 void initializeFunctions(uintptr_t hNtdllPtr, uintptr_t NtReadVirtualMemoryPtr) {
@@ -506,19 +507,19 @@ void initializeFunctions(uintptr_t hNtdllPtr, uintptr_t NtReadVirtualMemoryPtr) 
 ```
 
 
-First, the address is leaked using the dummy program with the heap overread vulnerability:
+To test this, first the address is leaked using the dummy program with the heap overread vulnerability:
 
 ![nbcg0](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nbcg_0.png)
 
 
-Next, we attempt to run it using the address to find it still works:
+Next, we compile it and attempt to run it using the address, finding it still works:
 
 ```
 cl /Fe:NativeBypassCredGuard_Updated.exe NativeBypassCredGuard_Updated.cpp
 ```
 
 ```
-NativeBypassCredGuard_Updated.exe <NtReadVirtualMemory_Address> patch
+NativeBypassCredGuard_Updated.exe <NtReadVirtualMemory_Address> <check/patch>
 ```
 
 ![nbcg1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nbcg_1.png)
