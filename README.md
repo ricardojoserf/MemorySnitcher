@@ -505,21 +505,29 @@ void initializeFunctions(uintptr_t hNtdllPtr, uintptr_t NtReadVirtualMemoryPtr) 
 }
 ```
 
-Next, we attempt to run it to find it still works:
+
+First, the addresses are leaked using the heap overread code:
 
 ![nbcg1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nbcg_1.png)
 
 
-And analyze it with PE-Bear to find *GetProcAddress* and *LoadLibrary* is missing:
+Next, we attempt to run it using the addresses to find it still works:
+
+![nbcg1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nbcg_1.png)
+
+
+Finally, analyze it with PE-Bear to find *GetProcAddress* and *LoadLibrary* are missing:
 
 ![nbcg2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nbcg_2.png)
 
 <br>
 
 
+
+
 ## Conclusion
 
-In summary, dynamically resolving NTAPI functions without relying on the Import Address Table remains a tricky problem due to the chicken-and-egg issue of needing NtReadVirtualMemory and ntdll.dll addresses upfront. 
+In summary, dynamically resolving NTAPI functions without relying on the Import Address Table remains a tricky problem due to the chicken-and-egg issue of needing *NtReadVirtualMemory* and ntdll.dll addresses upfront. 
 
 Directly printing these addresses is the simplest approach but easily raises suspicion and detection risks.
 
