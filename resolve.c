@@ -187,8 +187,9 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    uintptr_t ntdll_address = strtoull(argv[1], NULL, 0);
-    uintptr_t func_address = strtoull(argv[2], NULL, 0);
+    uintptr_t ntdll_address = (uintptr_t)strtoull(argv[1], NULL, 16);
+    uintptr_t func_address =  (uintptr_t)strtoull(argv[2], NULL, 16);
+
     HMODULE hNtdll = (HMODULE)ntdll_address;
     NtReadVirtualMemory = (NtReadVirtualMemoryFn)func_address;
         
