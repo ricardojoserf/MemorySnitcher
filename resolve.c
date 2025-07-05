@@ -1,5 +1,8 @@
 #include <windows.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
 
 typedef enum   _PROCESSINFOCLASS { ProcessBasicInformation = 0 } PROCESSINFOCLASS;
 typedef struct _UNICODE_STRING { USHORT Length, MaximumLength; PWSTR Buffer; } UNICODE_STRING, * PUNICODE_STRING;
@@ -138,11 +141,17 @@ uintptr_t CustomGetModuleHandle(HANDLE hProcess, const char* dll_name) {
 
 // Custom implementation for GetProcAddress - NtReadVirtualMemory
 void* CustomGetProcAddress(void* pDosHdr, const char* func_name) {
+    // printf("[*] CustomGetProcAddress called with pDosHdr = 0x%p, func_name = %s\n", pDosHdr, func_name);
     int exportrva_offset = 136;
     HANDLE hProcess = (HANDLE)-1;
     DWORD e_lfanew_value = 0;
     SIZE_T aux = 0;
     NtReadVirtualMemory(hProcess, (BYTE*)pDosHdr + 0x3C, &e_lfanew_value, sizeof(e_lfanew_value), &aux);
+    
+    if (e_lfanew_value == 0) {
+        return NULL;
+    }
+
     WORD sizeopthdr_value = 0;
     NtReadVirtualMemory(hProcess, (BYTE*)pDosHdr + e_lfanew_value + 20, &sizeopthdr_value, sizeof(sizeopthdr_value), &aux);
     DWORD exportTableRVA_value = 0;
@@ -181,28 +190,80 @@ void* CustomGetProcAddress(void* pDosHdr, const char* func_name) {
 }
 
 
+void* get_ntdll_base_address(const char* input) {
+    char full_address_str[32];
+    int len = strlen(input);
+    char prefix[32] = {0};
+    strncpy(prefix, input, len - 6);
+    prefix[len - 6] = '\0';
+
+    char last6[7] = {0};
+    strncpy(last6, input + len - 6, 6);
+
+    unsigned int last6_val = (unsigned int)strtoul(last6, NULL, 16);
+    unsigned int first_nibble = (last6_val >> 20) & 0xF;
+    unsigned int second_nibble = (last6_val >> 16) & 0xF;
+    unsigned int lower_16bits = 0;
+
+    // Combinaciones con segundo nibble variando de 0x0 a 0xF con primer nibble fijo
+    for (unsigned int i = 0; i <= 0xF; i++) {
+        unsigned int new_val = (first_nibble << 20) | (i << 16) | lower_16bits;
+        snprintf(full_address_str, sizeof(full_address_str), "%s%06X", prefix, new_val);
+        // printf("%s\n", full_address_str);
+
+        void* base_address_test = (void*)strtoull(full_address_str, NULL, 16);
+        void* pFunc = CustomGetProcAddress(base_address_test, "NtClose");
+        if (pFunc != NULL) {
+            return base_address_test;
+        }
+    }
+
+    // Now the second batch: first nibble decreased by 1
+    // Combinaciones con segundo nibble variando de 0x0 a 0xF con primer nibble decrecido
+    if (first_nibble > 0) {
+        unsigned int prev_first_nibble = first_nibble - 1;
+
+        for (unsigned int i = 0; i <= 0xF; i++) {
+            unsigned int new_val = (prev_first_nibble << 20) | (i << 16) | lower_16bits;
+            snprintf(full_address_str, sizeof(full_address_str), "%s%06X", prefix, new_val);
+            // printf("%s\n", full_address_str);
+
+            void* base_address_test = (void*)strtoull(full_address_str, NULL, 16);
+            void* pFunc = CustomGetProcAddress(base_address_test, "NtClose");
+
+            if (pFunc != NULL) {
+                return base_address_test;
+            }
+        }
+    }
+
+    return NULL;
+}
+
+
 int main(int argc, char* argv[]) {
-    if (argc < 5) {
-        printf("Usage: %s <ntdll_addr> <ntrvm_addr> <dll_name> <function_name>\n", argv[0]);
+    if (argc < 4) {
+        printf("Usage: %s <ntrvm_addr> <dll_name> <function_name>\n", argv[0]);
         return 1;
     }
 
-    uintptr_t ntdll_address = (uintptr_t)strtoull(argv[1], NULL, 16);
-    uintptr_t func_address =  (uintptr_t)strtoull(argv[2], NULL, 16);
+    // uintptr_t ntdll_address = (uintptr_t)strtoull(argv[1], NULL, 16);
+    uintptr_t func_address =  (uintptr_t)strtoull(argv[1], NULL, 16);
 
-    HMODULE hNtdll = (HMODULE)ntdll_address;
     NtReadVirtualMemory = (NtReadVirtualMemoryFn)func_address;
-        
-    if (stricmp(argv[3], "ntdll.dll") == 0) {
-        const char* func_name = argv[4];
-        
+    HMODULE hNtdll = (HMODULE) get_ntdll_base_address(argv[1]);
+    printf("[+] Ntdll.dll Address:\t0x%p\n", hNtdll);
+    
+    if (stricmp(argv[2], "ntdll.dll") == 0) {
+        const char* func_name = argv[3];
+
         void* pFunc = CustomGetProcAddress(hNtdll, func_name);
         printf("[+] NTAPI address: \t0x%p\n", pFunc);
     }
 
     else {
-        const char* dll_name = argv[3];
-        const char* func_name = argv[4];
+        const char* dll_name = argv[2];
+        const char* func_name = argv[3];
         
         NtQueryInformationProcess = (NtQueryInformationProcessFn)CustomGetProcAddress(hNtdll, "NtQueryInformationProcess");
         RtlUnicodeStringToAnsiString = (RtlUnicodeStringToAnsiStringFn)CustomGetProcAddress(hNtdll, "RtlUnicodeStringToAnsiString");
