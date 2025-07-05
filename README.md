@@ -189,7 +189,7 @@ void test() {
 }
 ```
 
-Compile [taskmanager_print_addresses.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/taskmanager_print_addresses.cpp) and run it:
+Compile [taskmanager_print_addresses.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/taskmanager_print_addresses.cpp) using "x64 Native Tools Command Prompt for VS" and run it:
 
 ```
 cl /Fe:taskmanager_print_addresses.exe taskmanager_print_addresses.cpp /Od /Zi /RTC1
@@ -235,13 +235,11 @@ int main() {
 }
 ```
 
-Compile it using the following command:
+Compile it using the following command and execute it:
 
 ```
 cl /Fe:leak_format_string.exe leak_format_string.c /Od /Zi /RTC1
 ```
-
-And execute it:
 
 ![fs1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_1.png)
 
@@ -266,6 +264,10 @@ int main() {
 ```
 
 The previous simple code snippet is available [here](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_format_string.c), compile it again and get the addresses:
+
+```
+cl leak_format_string.c /Feformat_string_addresses.exe
+```
 
 ![fs2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_2.png)
 
@@ -310,13 +312,11 @@ int main() {
 }
 ```
 
-Compile it using the following command:
+Compile it using the following command and execute it:
 
 ```
 cl /Fe:leak_stack_overread.exe leak_stack_overread.c /Od /Zi /RTC1
 ```
-
-And execute it:
 
 ![or1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_1.png)
 
@@ -345,6 +345,10 @@ int main() {
 ```
 
 The previous simple code snippet is available [here](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_stack_overread.c), compile it again and get the addresses:
+
+```
+cl leak_stack_overread.c /Feoverread_addresses.exe
+```
 
 ![or2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_2.png)
 
@@ -388,13 +392,11 @@ int main() {
 }
 ```
 
-Compile it using the following command:
+Compile it using the following command and execute it:
 
 ```
 cl /Fe:leak_heap_overread.exe leak_heap_overread.c /Od /Zi /RTC1
 ```
-
-And execute it:
 
 ![hor1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/heap_overread_1.png)
 
@@ -426,6 +428,10 @@ int main() {
 ```
 
 The previous simple code snippet is available [here](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_heap_overread.c), compile it again and get the addresses:
+
+```
+cl leak_heap_overread.c /Feheap_overread_addresses.exe
+```
 
 ![hor2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/heap_overread_2.png)
 
@@ -523,8 +529,6 @@ Finally, analyze it with PE-Bear to find *GetProcAddress* and *LoadLibrary* are 
 ![nbcg2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nbcg_2.png)
 
 <br>
-
-
 
 
 ## Conclusion
