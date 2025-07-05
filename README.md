@@ -101,9 +101,7 @@ int main() {
 
 From this code, we find we only call *GetModuleHandleA* once to get ntdll.dll address; and *GetProcAddress* once to get *NtReadVirtualMemory* address. The rest of the addresses can be calculated dynamically!
 
-The problem is, even if we only call them once, we would have *GetModuleHandleA* and *GetProcAddress* functions in the Import Address Table of the binary, which can be considered suspicious. 
-
-Let's verify it using PE-BEAR:
+The problem is, even if we only call them once, we would have *GetModuleHandleA* and *GetProcAddress* functions in the Import Address Table of the binary, which can be considered suspicious. Let's verify it using PE-BEAR:
 
 ![it1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nativentdllremap_import_table.png)
 
