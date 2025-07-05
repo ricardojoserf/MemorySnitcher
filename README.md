@@ -97,6 +97,8 @@ int main() {
 
 - Then, any function address in any DLL can be calculated dynamically using the custom implementation of *GetModuleHandle*.
 
+<br>
+
 From this code, we find we only call *GetModuleHandleA* once to get ntdll.dll address; and *GetProcAddress* once to get *NtReadVirtualMemory* address. The rest of the addresses can be calculated dynamically!
 
 The problem is, even if we only call them once, we would have *GetModuleHandleA* and *GetProcAddress* functions in the Import Address Table of the binary, which can be considered suspicious. 
