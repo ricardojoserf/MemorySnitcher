@@ -134,7 +134,7 @@ The file *resolve.c* contains the code to resolve the function in any DLL given 
 
 ## Approach 1: Print the address
 
-The easiest way to obtain the addresses is just to print it: 
+The easiest way to obtain the address is just to resolve the function and print the value: 
 
 ```c
 #include <iostream>
