@@ -475,7 +475,7 @@ void initializeFunctions() {
 }
 ```
 
-The updated version [NativeBypassCredGuard_Updated.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/NativeBypassCredGuard_Updated.cpp) will take 2 more input arguments which will take the two needed addresses:
+The updated version, [NativeBypassCredGuard_Updated.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/NativeBypassCredGuard_Updated.cpp), requires two additional input arguments corresponding to the necessary addresses:
 
 ```
 int main(int argc, char* argv[]) {
