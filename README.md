@@ -113,7 +113,7 @@ Regarding the other 15 functions, these appear because the binary was compiled w
 
 There are many blogs about compiling without CRT so I will not do it here (also, maybe not having any function in the IAT looks even worse).
 
-These 2 addresses are just numbers, so could be hardcoded or used as input arguments to the program. But, how can we get these values?
+These 2 addresses are just numbers, so could be hardcoded or used as input arguments to the program. But... how can we get these values?
 
 <br>
 
@@ -143,11 +143,10 @@ It is straightforward, but not very OPSEC-safe:
 
 ![rav](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/read_addresses_virustotal_1.png)
 
-However, these addresses are just numbers, so there are some silly methods to use them. 
 
 Their values will change for every system reboot, so hardcoding them is not useful, but we can use the output from a program like *read_addresses.exe* as input parameters for our program.
 
-The file *resolve.c* contains the code to resolve the function in any DLL given four parameters: the DLL containing that function, the function name, ntdll.dll address and *NtReadVirtualMemory* address.
+The file *resolve.c* contains the code to resolve the function in any DLL given four parameters: the DLL containing that function, the function name, the ntdll.dll address and the *NtReadVirtualMemory* address.
 
 ![r1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/resolve_1.png)
 
@@ -160,13 +159,13 @@ We could not find a stealthy way to resolve these 2 addresses, but we know it is
 
 ## Approach 2: More code!
 
-The code probably does too much for so few lines of code, so I will rely on AI to create the most generic application (a Task Manager):
+The code probably does too much for so few lines of code, so I will rely on AI to create the most generic application (a Task Management program):
 
 ```
 Give me the code for a C++ application of at least 300 lines that under no circumstances could be considered malicious by an antivirus or EDR. For example, a Task management program
 ```
 
-The code prompts the user to press a key from 1 to 6, we will add a secret option 33:
+The code prompts the user to press a key from 1 to 6, but we will add a secret option 33:
 
 ```c
 switch (choice) {
@@ -184,6 +183,7 @@ The called function will print the addresses:
 void test() {
     HMODULE hNtdll = LoadLibraryA("ntdll.dll");
     FARPROC pNtReadVirtualMemory = GetProcAddress(hNtdll, "NtReadVirtualMemory");
+    printf("0x%p\t0x%p\n", hNtdll, hNtdll);
     printf("0x%p\t0x%p\n", hNtdll, pNtReadVirtualMemory);
     return;
 }
