@@ -483,9 +483,10 @@ The updated version, [NativeBypassCredGuard_Updated.cpp](https://github.com/rica
 
 ```
 int main(int argc, char* argv[]) {
-   uintptr_t initArg1 = (uintptr_t)strtoull(argv[1], NULL, 16);
-   uintptr_t initArg2 = (uintptr_t)strtoull(argv[2], NULL, 16);
-   initializeFunctions(initArg1, initArg2
+   uintptr_t func_address =  (uintptr_t)strtoull(argv[1], NULL, 16);
+   NtReadVirtualMemory = (NtReadVirtualMemoryFn)func_address;
+   uintptr_t hNtdll = (uintptr_t) get_ntdll_base_address(argv[1]);
+   initializeFunctions(hNtdll, func_address);
    ...
 }
 ```
@@ -523,6 +524,10 @@ First, the addresses are leaked using the heap overread code:
 
 
 Next, we attempt to run it using the addresses to find it still works:
+
+```
+cl /Fe:NativeBypassCredGuard_Updated.exe NativeBypassCredGuard_Updated.cpp
+```
 
 ![nbcg1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/nbcg_1.png)
 
