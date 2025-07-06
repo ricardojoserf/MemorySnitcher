@@ -449,26 +449,15 @@ Once we get the leaked addresses, what can we do? Well we can update tools like 
 void initializeFunctions() {
     HMODULE hNtdll = LoadLibraryA("ntdll.dll");
     NtReadVirtualMemory = (NtReadVirtualMemoryFn)GetProcAddress((HMODULE)hNtdll, "NtReadVirtualMemory");
+
     NtQueryInformationProcess = (NtQueryInformationProcessFn)CustomGetProcAddress(hNtdll, "NtQueryInformationProcess");
     NtClose = (NtCloseFn)CustomGetProcAddress(hNtdll, "NtClose");
     NtOpenProcessToken = (NtOpenProcessTokenFn)CustomGetProcAddress(hNtdll, "NtOpenProcessToken");
-    NtAdjustPrivilegesToken = (NtAdjustPrivilegesTokenFn)CustomGetProcAddress(hNtdll, "NtAdjustPrivilegesToken");
-    NtGetNextProcess = (NtGetNextProcessFn)CustomGetProcAddress(hNtdll, "NtGetNextProcess");
-    NtCreateFile = (NtCreateFileFn)CustomGetProcAddress(hNtdll, "NtCreateFile");
-    NtReadFile = (NtReadFileFn)CustomGetProcAddress(hNtdll, "NtReadFile");
-    NtWriteVirtualMemory = (NtWriteVirtualMemoryFn)CustomGetProcAddress(hNtdll, "NtWriteVirtualMemory");
-    NtTerminateProcess = (NtTerminateProcessFn)CustomGetProcAddress(hNtdll, "NtTerminateProcess");
-    NtProtectVirtualMemory = (NtProtectVirtualMemoryFn)CustomGetProcAddress(hNtdll, "NtProtectVirtualMemory");
-    NtCreateUserProcess = (NtCreateUserProcessFn)CustomGetProcAddress(hNtdll, "NtCreateUserProcess");
-    RtlCreateProcessParametersEx = (RtlCreateProcessParametersExFn)CustomGetProcAddress(hNtdll, "RtlCreateProcessParametersEx");
-    RtlDestroyProcessParameters = (RtlDestroyProcessParametersFn)CustomGetProcAddress(hNtdll, "RtlDestroyProcessParameters");
-    RtlAllocateHeap = (RtlAllocateHeapFn)CustomGetProcAddress(hNtdll, "RtlAllocateHeap");
-    RtlFreeHeap = (RtlFreeHeapFn)CustomGetProcAddress(hNtdll, "RtlFreeHeap");
-    RtlInitUnicodeString = (RtlInitUnicodeStringFn)CustomGetProcAddress(hNtdll, "RtlInitUnicodeString");
+    ...
 }
 ```
 
-The updated version, [NativeBypassCredGuard_Updated.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/NativeBypassCredGuard_Updated.cpp), requires one additional input arguments corresponding to the *NtReadVirtualMemory* address:
+The updated version, [NativeBypassCredGuard_Updated.cpp](https://github.com/ricardojoserf/MemorySnitcher/blob/main/NativeBypassCredGuard_Updated.cpp), requires one additional input argument corresponding to the *NtReadVirtualMemory* address:
 
 ```
 int main(int argc, char* argv[]) {
@@ -490,19 +479,7 @@ void initializeFunctions(uintptr_t hNtdllPtr, uintptr_t NtReadVirtualMemoryPtr) 
     NtQueryInformationProcess = (NtQueryInformationProcessFn)CustomGetProcAddress(hNtdll, "NtQueryInformationProcess");
     NtClose = (NtCloseFn)CustomGetProcAddress(hNtdll, "NtClose");
     NtOpenProcessToken = (NtOpenProcessTokenFn)CustomGetProcAddress(hNtdll, "NtOpenProcessToken");
-    NtAdjustPrivilegesToken = (NtAdjustPrivilegesTokenFn)CustomGetProcAddress(hNtdll, "NtAdjustPrivilegesToken");
-    NtGetNextProcess = (NtGetNextProcessFn)CustomGetProcAddress(hNtdll, "NtGetNextProcess");
-    NtCreateFile = (NtCreateFileFn)CustomGetProcAddress(hNtdll, "NtCreateFile");
-    NtReadFile = (NtReadFileFn)CustomGetProcAddress(hNtdll, "NtReadFile");
-    NtWriteVirtualMemory = (NtWriteVirtualMemoryFn)CustomGetProcAddress(hNtdll, "NtWriteVirtualMemory");
-    NtTerminateProcess = (NtTerminateProcessFn)CustomGetProcAddress(hNtdll, "NtTerminateProcess");
-    NtProtectVirtualMemory = (NtProtectVirtualMemoryFn)CustomGetProcAddress(hNtdll, "NtProtectVirtualMemory");
-    NtCreateUserProcess = (NtCreateUserProcessFn)CustomGetProcAddress(hNtdll, "NtCreateUserProcess");
-    RtlCreateProcessParametersEx = (RtlCreateProcessParametersExFn)CustomGetProcAddress(hNtdll, "RtlCreateProcessParametersEx");
-    RtlDestroyProcessParameters = (RtlDestroyProcessParametersFn)CustomGetProcAddress(hNtdll, "RtlDestroyProcessParameters");
-    RtlAllocateHeap = (RtlAllocateHeapFn)CustomGetProcAddress(hNtdll, "RtlAllocateHeap");
-    RtlFreeHeap = (RtlFreeHeapFn)CustomGetProcAddress(hNtdll, "RtlFreeHeap");
-    RtlInitUnicodeString = (RtlInitUnicodeStringFn)CustomGetProcAddress(hNtdll, "RtlInitUnicodeString");
+    ...
 }
 ```
 
@@ -534,10 +511,13 @@ Finally, analyze it with PE-Bear to find *GetProcAddress*, *GetModuleHandle* and
 
 ## Conclusion
 
-In summary, dynamically resolving NTAPI functions without relying on the Import Address Table remains a tricky problem due to the chicken-and-egg issue of needing *NtReadVirtualMemory* upfront. 
+In summary, dynamically resolving NTAPI functions without suspicious functions appearing in the Import Address Table remains a tricky problem due to the chicken-and-egg issue of needing *NtReadVirtualMemory* upfront. 
 
 Directly resolving and printing the address is the simplest approach but it easily raises suspicion and detection risks.
 
-By embedding the address leak inside a seemingly benign, large application, either through intentional vulnerabilities like format string bugs, stack over-reads, or heap overrides, we can covertly expose the address of this function. This technique seems to effectively bypass many static detection mechanisms and can be adapted with autogenerated code to evade heuristic and signature-based detections.
+By embedding the address leak inside a seemingly benign, large application, either through intentional vulnerabilities like format string bugs, stack over-reads, or heap overrides, we can expose the address of this function. This technique seems to effectively bypass many static detection mechanisms and can be adapted with autogenerated code to evade heuristic and signature-based detections.
 
 Incorporating this strategy into tools, in this case NativeBypassCredGuard, shows how this could help to make API resolution stealthier because common APIs needed for it such as *GetProcAddress*, *GetModuleHandle* and *LoadLibrary* are not present in the Import Address Table of the binary.
+
+So... is this useful? I am not sure, but it was fun to write about it :)
+
