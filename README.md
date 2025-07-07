@@ -117,7 +117,7 @@ There are many blogs about compiling without CRT so I will not do it here (also,
 
 After some tests, I found that the ntdll.dll base address can be bruteforced given the *NtReadVirtualMemory* address. For example, if the function address is 0x7FFE5424D7B0, the module's base address can be any value from 0x7FFE54100000 to 0x7FFE542D0000. So I created a small script to test all addresses like 0x7FFE54100000, 0x7FFE54120000, ... , 0x7FFE541F0000, 0x7FFE54200000, 0x7FFE54210000, ... , 0x7FFE542F0000.   
 
-The file *resolve.c* contains the code to resolve the function in any DLL given three parameters: 
+The file [resolve.c](https://github.com/ricardojoserf/MemorySnitcher/blob/main/resolve.c) contains the code to resolve the function in any DLL given three parameters: 
 
 - The *NtReadVirtualMemory* address.
 
