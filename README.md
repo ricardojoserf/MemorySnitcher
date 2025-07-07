@@ -221,7 +221,7 @@ Once the previous technique is explained to the Blue Team, (I guess) they could 
 
 ### Leak 1: Format String Vulnerability
 
-This code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
+The code in [this snippet](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/format_string_example.c) should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
 
 ```c
 #include <stdio.h>
@@ -240,12 +240,12 @@ int main() {
 Compile it using "x64 Native Tools Command Prompt for VS" and execute it:
 
 ```
-cl /Fe:format_string.exe leak_format_string.c /Od /Zi /RTC1
+cl /Fe:format_string_example.exe format_string_example.c /Od /Zi /RTC1
 ```
 
 ![fs1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_1.png)
 
-The values are leaked! Now it is time to leak the function address, you can find the following snippet [here](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_format_string.c):
+The values are leaked! Now it is time to leak the function address, you can use [this snippet](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/format_string_address_leak.c):
 
 ```c
 #include <windows.h>
@@ -267,7 +267,7 @@ int main() {
 Compile it and get the address:
 
 ```
-cl /Fe:format_string_addresses.exe leak_format_string.c /Od /Zi /RTC1
+cl /Fe:format_string_address_leak.exe format_string_address_leak.c /Od /Zi /RTC1
 ```
 
 ![fs2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/format_string_2.png)
@@ -293,7 +293,7 @@ The rest of the examples offered similar results. If you compile the programs an
 
 ### Leak 2: Stack Over-read
 
-This code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
+The code in [this snippet](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/stack_overread_example.c) should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
 
 ```c
 #include <stdio.h>
@@ -316,12 +316,12 @@ int main() {
 Compile it using the following command and execute it:
 
 ```
-cl /Fe:overread.exe leak_stack_overread.c /Od /Zi /RTC1
+cl /Fe:stack_overread_example.exe stack_overread_example.c /Od /Zi /RTC1
 ```
 
 ![or1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_1.png)
 
-The values are leaked! Now it is time to leak the function address, you can find the following snippet [here](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_stack_overread.c):
+The values are leaked! Now it is time to leak the function address, you can use [this snippet](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/stack_overread_address_leak.c):
 
 ```c
 #include <windows.h>
@@ -345,7 +345,7 @@ int main() {
 Compile it and get the address:
 
 ```
-cl /Fe:overread_addresses.exe leak_stack_overread.c /Od /Zi /RTC1
+cl /Fe:stack_overread_address_leak.exe stack_overread_address_leak.c /Od /Zi /RTC1
 ```
 
 ![or2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/overread_2.png)
@@ -365,7 +365,7 @@ cl /Fe:taskmanager_stack_overread.exe taskmanager_stack_overread.cpp /Od /Zi /RT
 
 ### Leak 3: Heap override
 
-This code should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
+The code in [this snippet](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/heap_overread_example.c) should leak the 0xAAAAAAAAAA and 0xBBBBBBBBBB values in the "leakme1" and "leakme2" variables:
 
 ```c
 #include <stdio.h>
@@ -393,12 +393,12 @@ int main() {
 Compile it using the following command and execute it:
 
 ```
-cl /Fe:heap_overread.exe leak_heap_overread.c /Od /Zi /RTC1
+cl /Fe:heap_overread_example.exe heap_overread_example.c /Od /Zi /RTC1
 ```
 
 ![hor1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/heap_overread_1.png)
 
-The values are leaked! Now it is time to leak the function address, you can find the following snippet [here](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/leak_heap_overread.c):
+The values are leaked! Now it is time to leak the function address, you can use [this snippet](https://github.com/ricardojoserf/MemorySnitcher/blob/main/snippets/heap_overread_address_leak.c):
 
 ```c
 #include <windows.h>
@@ -422,7 +422,7 @@ int main() {
 Compile it and get the address:
 
 ```
-cl /Fe:heap_overread_addresses.exe leak_heap_overread.c /Od /Zi /RTC1
+cl /Fe:heap_overread_address_leak.exe heap_overread_address_leak.c /Od /Zi /RTC1
 ```
 
 ![hor2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/memorysnitcher/heap_overread_2.png)
